@@ -31,12 +31,15 @@ public class Game1 : Game
     private List<DamageNumber> _damageNumbers = new List<DamageNumber>();
     
     // Cursor
-    private Texture2D _cursorTexture; // Varsayılan cursor
-    private Texture2D _magicCursorTexture; // Mod için
+    // Cursor
+    // private Texture2D _cursorTexture; // Varsayılan cursor (Kaldırıldı)
+    // private Texture2D _magicCursorTexture; // Mod için (Kaldırıldı)
     
     // Tam ekran toggle için
     // Tam ekran toggle için
+    // Tam ekran toggle için
     private KeyboardState _previousKeyState;
+    private MouseState _previousMouseState;
 
     // SFX
     private SoundEffect _sfxSlice1;
@@ -62,6 +65,21 @@ public class Game1 : Game
     private Texture2D _vendorTexture;
     private bool _nearVendor = false;
     private const float VENDOR_INTERACTION_RANGE = 100f;
+    
+    // Kamera ve Harita
+    private Camera2D _camera;
+    private const int MAP_WIDTH = 2500;
+    private const int MAP_HEIGHT = 1600;
+    
+    // Game Log
+    private GameLog _gameLog;
+    
+    // UI Butonlar
+    private Texture2D _bagButtonTexture;
+    private Rectangle _bagButtonRect;
+    private bool _isHoveringBag;
+    
+
 
     public Game1()
     {
@@ -304,19 +322,12 @@ public class Game1 : Game
                 
                 _player.GainGold(goldAmount);
                 
-                // XP Popup
-                 _damageNumbers.Add(new DamageNumber(
-                    enemy.Position + new Vector2(0, -50),
-                    xpAmount,
-                    Color.Cyan 
-                ));
+                // XP Popup yerine Log
+                // _damageNumbers.Add(...) -> iptal
+                _gameLog.AddMessage($"+{xpAmount} XP", Color.Cyan);
                 
-                // Altın Popup
-                 _damageNumbers.Add(new DamageNumber(
-                    enemy.Position + new Vector2(20, -40), // XP'nin biraz yanı
-                    goldAmount, // Sadece sayı
-                    Color.Gold // Altın rengi
-                ));
+                // Altın Popup yerine Log
+                _gameLog.AddMessage($"+{goldAmount} Altin", Color.Gold);
                 
                 // === LOOT DROP ===
                 var drops = LootManager.GetLoot(enemy.Type);
@@ -328,11 +339,7 @@ public class Game1 : Game
                         Item itemDrop = ItemDatabase.GetItem(drop.ItemId);
                         
                         // Drop bildirimi
-                        _damageNumbers.Add(new DamageNumber(
-                            enemy.Position + new Vector2(0, -60), // Daha yukarıda
-                            0, // Hasar yok
-                            itemDrop.GetRarityColor()
-                        ) { CustomText = itemDrop.Name }); // CustomText özelliği eklemeliyiz veya DamageNumber'ı modifiye etmeliyiz
+                        _gameLog.AddMessage($"Kazanildi: {itemDrop.Name}", itemDrop.GetRarityColor());
                     }
                 }
             }
@@ -347,8 +354,15 @@ public class Game1 : Game
             GraphicsDevice.Viewport.Width, 
             GraphicsDevice.Viewport.Height);
             
+        // Kamera Oluştur
+        _camera = new Camera2D(GraphicsDevice.Viewport, MAP_WIDTH, MAP_HEIGHT);
+        _shopUI = new ShopUI(GraphicsDevice, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+        
+        // Game Log Oluştur
+        _gameLog = new GameLog(GraphicsDevice.Viewport.Height);
+            
         // Arka Plan Texture Oluştur
-        _backgroundTexture = CreateDungeonFloor();
+        _backgroundTexture = CreateDungeonFloor(1);
         
         // Başlangıç Eşyaları (Login sonrası eklenecek, buradakileri kaldırıyoruz)
         // _inventory.AddItem(1); 
@@ -437,51 +451,113 @@ public class Game1 : Game
         
         // İlk Haritayı Yükle
         LoadMap(1);
+        
+        // Çanta Butonu Oluştur (Sağ Alt)
+        int bagSize = 64;
+        _bagButtonRect = new Rectangle(
+            GraphicsDevice.Viewport.Width - bagSize - 20,
+            GraphicsDevice.Viewport.Height - bagSize - 20,
+            bagSize, bagSize
+        );
+        
+        _bagButtonTexture = CreateBagIcon(GraphicsDevice, bagSize);
+    }
+    
+    private Texture2D CreateBagIcon(GraphicsDevice graphicsDevice, int size)
+    {
+        Texture2D texture = new Texture2D(graphicsDevice, size, size);
+        Color[] colors = new Color[size * size];
+        
+        Color bagColor = new Color(100, 60, 30);
+        Color strapColor = new Color(140, 100, 60);
+        Color buckleColor = Color.Gold;
+        
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                int i = y * size + x;
+                colors[i] = Color.Transparent;
+                
+                // Çanta Gövdesi (Yuvarlakça)
+                float cx = size / 2f;
+                float cy = size / 2f + 5;
+                float dx = x - cx;
+                float dy = y - cy;
+                
+                if ((dx*dx)/500 + (dy*dy)/400 < 1.0f)
+                {
+                     colors[i] = bagColor;
+                     
+                     // Kapak
+                     if (y < size/2 && Math.Abs(x - cx) < size/2.5f) colors[i] = strapColor;
+                     
+                     // Toka
+                     if (Math.Abs(x - cx) < 4 && Math.Abs(y - size/2) < 4) colors[i] = buckleColor;
+                }
+            }
+        }
+        texture.SetData(colors);
+        return texture;
     }
     
     private void LoadMap(int mapIndex)
     {
         _currentMapIndex = mapIndex;
         _enemyManager.ClearGroups();
-        _damageNumbers.Clear(); // Yerdeki paralar/yazılar silinsin mi? Evet, yeni map.
+        _damageNumbers.Clear();
         
-        int screenWidth = GraphicsDevice.Viewport.Width;
-        int screenHeight = GraphicsDevice.Viewport.Height;
+        // Arka Plan Texture'ını map'e göre oluştur
+        _backgroundTexture = CreateDungeonFloor(mapIndex);
+        
+        // Harita boyutlarını kameraya bildir (Gerekirse map'e göre değişebilir)
+        _camera.SetMapSize(MAP_WIDTH, MAP_HEIGHT);
+        
+        int safeMargin = 100;
+        Random rnd = new Random();
         
         if (mapIndex == 1)
         {
-            // --- MAP 1: SAFE ZONE ---
-            // Sadece NPC'ler (şimdilik boş)
+            // --- MAP 1: GÜVENLİ BÖLGE ---
+            // Satıcı Tam Ortada
+            _vendorPosition = new Vector2(MAP_WIDTH / 2f - 24, MAP_HEIGHT / 2f - 32);
         }
         else if (mapIndex == 2)
         {
-            // --- MAP 2: GOBLINS ---
-            // Sol ve Sağ, Dağınık
-             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.2f, screenHeight * 0.4f), EnemyType.Goblin, 3);
-             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.8f, screenHeight * 0.6f), EnemyType.Goblin, 3);
-             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.5f, screenHeight * 0.5f), EnemyType.Goblin, 4);
+            // --- MAP 2: GOBLIN LANDS --- (Kolay, Çok sayıda)
+            for (int i = 0; i < 8; i++) // 8 Grup
+            {
+                int x = rnd.Next(safeMargin, MAP_WIDTH - safeMargin);
+                int y = rnd.Next(safeMargin, MAP_HEIGHT - safeMargin);
+                _enemyManager.SpawnGroup(new Vector2(x, y), EnemyType.Goblin, 3);
+            }
         }
         else if (mapIndex == 3)
         {
-             // --- MAP 3: SPIDERS ---
-             // Köşeler
-             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.1f, screenHeight * 0.1f), EnemyType.Spider, 2);
-             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.9f, screenHeight * 0.1f), EnemyType.Spider, 2);
-             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.1f, screenHeight * 0.9f), EnemyType.Spider, 2);
-             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.9f, screenHeight * 0.9f), EnemyType.Spider, 2);
-             
-             // Orta
-             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.5f, screenHeight * 0.5f), EnemyType.Spider, 3);
+            // --- MAP 3: SPIDER CAVE --- (Orta)
+            for (int i = 0; i < 6; i++) // 6 Grup
+            {
+                int x = rnd.Next(safeMargin, MAP_WIDTH - safeMargin);
+                int y = rnd.Next(safeMargin, MAP_HEIGHT - safeMargin);
+                _enemyManager.SpawnGroup(new Vector2(x, y), EnemyType.Spider, 4);
+            }
         }
         else if (mapIndex == 4)
         {
-             // --- MAP 4: DEMONS ---
-             // Zorlu
-             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.5f, screenHeight * 0.3f), EnemyType.Demon, 2);
-             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.3f, screenHeight * 0.7f), EnemyType.Demon, 2);
-             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.7f, screenHeight * 0.7f), EnemyType.Demon, 2);
+            // --- MAP 4: DEMON HALL --- (Zor)
+            for (int i = 0; i < 5; i++)
+            {
+                int x = rnd.Next(safeMargin, MAP_WIDTH - safeMargin);
+                int y = rnd.Next(safeMargin, MAP_HEIGHT - safeMargin);
+                _enemyManager.SpawnGroup(new Vector2(x, y), EnemyType.Demon, 2);
+            }
+            
+            // FİNAL BOSS - Ortada tek başına
+            _enemyManager.SpawnGroup(new Vector2(MAP_WIDTH/2, MAP_HEIGHT/2), EnemyType.Demon, 1);
         }
     }
+        
+
 
     protected override void Update(GameTime gameTime)
     {
@@ -572,40 +648,46 @@ public class Game1 : Game
         {
            IsMouseVisible = !_graphics.IsFullScreen;
             
-           // Oyuncu ve Düşmanlar
-           _player.Update(gameTime, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
-           _player.UpdateCombat(gameTime, _enemyManager);
-           _enemyManager.Update(gameTime, _player.Center, _player.Bounds);
-           
-           // --- HARİTA GEÇİŞ KONTROLÜ ---
-           // Yukarıdan çıkış -> Sonraki Map
-           if (_player.Position.Y < -20)
-           {
-               if (_currentMapIndex < MAX_MAPS)
-               {
-                   LoadMap(_currentMapIndex + 1);
-                   _player.SetPosition(new Vector2(_player.Position.X, GraphicsDevice.Viewport.Height - 80));
-               }
-               else
-               {
-                   // Son maptesin, gidemezsin
-                   _player.SetPosition(new Vector2(_player.Position.X, 0));
-               }
-           }
-           // Aşağıdan çıkış -> Önceki Map
-           else if (_player.Position.Y > GraphicsDevice.Viewport.Height)
-           {
-               if (_currentMapIndex > 1)
-               {
-                   LoadMap(_currentMapIndex - 1);
-                   _player.SetPosition(new Vector2(_player.Position.X, 10));
-               }
-               else
-               {
-                   // İlk maptesin, gidemezsin
-                   _player.SetPosition(new Vector2(_player.Position.X, GraphicsDevice.Viewport.Height - 64));
-               }
-           }
+        // Oyuncu ve Düşmanlar
+        // MAP boyutlarını veriyoruz artık, screen değil
+        _player.Update(gameTime, MAP_WIDTH, MAP_HEIGHT);
+        _player.UpdateCombat(gameTime, _enemyManager);
+        _enemyManager.Update(gameTime, _player.Center, _player.Bounds);
+        
+        // Kamerayı güncelle
+        _camera.Update(_player.Center);
+        
+        // --- HARİTA GEÇİŞ KONTROLÜ ---
+        // Yukarıdan çıkış -> Sonraki Map
+        if (_player.Position.Y < -20)
+        {
+            if (_currentMapIndex < MAX_MAPS)
+            {
+                LoadMap(_currentMapIndex + 1);
+                // Yeni mapte en aşağıdan başlat
+                _player.SetPosition(new Vector2(_player.Position.X, MAP_HEIGHT - 80));
+            }
+            else
+            {
+                // Son maptesin, gidemezsin
+                _player.SetPosition(new Vector2(_player.Position.X, 0));
+            }
+        }
+        // Aşağıdan çıkış -> Önceki Map
+        else if (_player.Position.Y > MAP_HEIGHT + 20)
+        {
+            if (_currentMapIndex > 1)
+            {
+                LoadMap(_currentMapIndex - 1);
+                // Yeni mapte en yukarıdan başlat
+                _player.SetPosition(new Vector2(_player.Position.X, 10));
+            }
+            else
+            {
+                // İlk maptesin, gidemezsin
+                _player.SetPosition(new Vector2(_player.Position.X, MAP_HEIGHT - 64));
+            }
+        }
         }
         
         // Hasar sayıları
@@ -615,7 +697,21 @@ public class Game1 : Game
             if (_damageNumbers[i].IsExpired) _damageNumbers.RemoveAt(i);
         }
         
+        // Log Update
+        _gameLog.Update(gameTime);
+        
+        // Çanta butonu kontrolü
+        Point mousePos = new Point(Mouse.GetState().X, Mouse.GetState().Y);
+        _isHoveringBag = _bagButtonRect.Contains(mousePos);
+        
+        if (_isHoveringBag && Mouse.GetState().LeftButton == ButtonState.Pressed && _previousMouseState.LeftButton == ButtonState.Released)
+        {
+            if (_inventory.IsOpen) _inventory.Close();
+            else _inventory.Open();
+        }
+        
         _previousKeyState = currentKeyState;
+        _previousMouseState = Mouse.GetState();
         base.Update(gameTime);
     }
     
@@ -642,23 +738,63 @@ public class Game1 : Game
     {
         GraphicsDevice.Clear(Color.Black);
 
-        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointWrap); // PointWrap önemli!
+        // --- 1. WORLD SPACE (Kamera Transformu ile) ---
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointWrap, null, null, null, _camera.GetViewMatrix());
         
         // --- ARKA PLAN ÇİZİMİ ---
-        // Ekranı kaplayacak şekilde "Tile" olarak çiziyoruz
+        // Harita boyutunda çiziyoruz
         if (_currentState != GameState.Login)
         {
-            Rectangle screenRect = new Rectangle(0, 0, _graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight);
-            // Source rectangle'ı ekran boyutunda yaparak texture'ın tekrarlanmasını sağlıyoruz (Wrap modu sayesinde)
-            _spriteBatch.Draw(_backgroundTexture, Vector2.Zero, screenRect, Color.White);
+            // Tüm harita alanı kadar
+            Rectangle mapRect = new Rectangle(0, 0, MAP_WIDTH, MAP_HEIGHT);
+            _spriteBatch.Draw(_backgroundTexture, Vector2.Zero, mapRect, Color.White);
         }
         else
         {
-             // Login ekranı için daha koyu/farklı bir mod ya da aynısı
+             // Login ekranı için sadece görünen alan
              Rectangle screenRect = new Rectangle(0, 0, _graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight);
-             _spriteBatch.Draw(_backgroundTexture, Vector2.Zero, screenRect, new Color(50, 50, 50)); // Karartılmış
+             _spriteBatch.Draw(_backgroundTexture, Vector2.Zero, screenRect, new Color(50, 50, 50));
         }
 
+        if (_currentState == GameState.Login)
+        {
+            // Login textleri aslında UI Layer'da olmalı ama burada da kalabilir, 
+            // fakat kamera transformundan etkilensin istemiyorsak UI batch'e taşımalıyız.
+            // Ama login ekranında kamera 0,0'da olacağı için sorun olmaz.
+            // Yine de title UI logic.
+            
+            // Biz Login'i UI batch'e taşıyalım, burada sadece entities çizilsin.
+        }
+        else
+        {
+            // Düşmanları çiz
+            _enemyManager.Draw(_spriteBatch);
+        
+            // Satıcı NPC'yi çiz (Sadece Map 1)
+            if (_currentMapIndex == 1)
+            {
+                _spriteBatch.Draw(_vendorTexture, _vendorPosition, Color.White);
+                
+                string vendorName = "SATICI";
+                Vector2 namePos = new Vector2(_vendorPosition.X + 24 - _gameFont.MeasureString(vendorName).X * 0.3f, _vendorPosition.Y - 15);
+                _spriteBatch.DrawString(_gameFont, vendorName, namePos, Color.Yellow, 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
+            }
+            
+            // Oyuncuyu çiz
+            _player.Draw(_spriteBatch);
+            
+            // Hasar sayılarını çiz
+            foreach (var dmgNum in _damageNumbers)
+            {
+                dmgNum.Draw(_spriteBatch, _gameFont);
+            }
+        } 
+
+        _spriteBatch.End();
+        
+        // --- 2. SCREEN SPACE UI (Transformsuz) ---
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend); // Varsayılan matrix=Identity
+        
         if (_currentState == GameState.Login)
         {
             string title = "The Warrior's Eternal Journey";
@@ -666,7 +802,6 @@ public class Game1 : Game
             string info = "[Enter] Basla";
             
             Vector2 screenCenter = new Vector2(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f);
-            
             Vector2 titleSize = _gameFont.MeasureString(title);
             Vector2 promptSize = _gameFont.MeasureString(prompt);
             
@@ -674,39 +809,8 @@ public class Game1 : Game
             _spriteBatch.DrawString(_gameFont, prompt, screenCenter - promptSize / 2, Color.White);
             _spriteBatch.DrawString(_gameFont, info, screenCenter - promptSize / 2 + new Vector2(0, 40), Color.Gray);
         }
-        else
+        else if (_currentState == GameState.Playing)
         {
-            // Düşmanları çiz
-            _enemyManager.Draw(_spriteBatch);
-        
-        // Satıcı NPC'yi çiz (Sadece Map 1)
-        if (_currentMapIndex == 1)
-        {
-            _spriteBatch.Draw(_vendorTexture, _vendorPosition, Color.White);
-            
-            // "SATICI" isim etiketi
-            string vendorName = "SATICI";
-            Vector2 namePos = new Vector2(_vendorPosition.X + 24 - _gameFont.MeasureString(vendorName).X * 0.3f, _vendorPosition.Y - 15);
-            _spriteBatch.DrawString(_gameFont, vendorName, namePos, Color.Yellow, 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
-        }
-        
-        // Oyuncuyu çiz
-        _player.Draw(_spriteBatch);
-        
-        // Hasar sayılarını çiz
-        foreach (var dmgNum in _damageNumbers)
-        {
-            dmgNum.Draw(_spriteBatch, _gameFont);
-        }
-        } // else kapanışı
-
-        _spriteBatch.End();
-        
-        if (_currentState == GameState.Playing)
-        {
-            // UI Layer
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
-            
             // Oyuncu sağlık barı (üst sol)
             DrawPlayerHealthBar();
             
@@ -717,15 +821,11 @@ public class Game1 : Game
             if (_inventory.IsEnhancementMode)
             {
                string modeText = "BIR ESYAYA TIKLA (YUKSELTME ICIN)";
-               Vector2 textSize = _gameFont.MeasureString(modeText);
                Vector2 mousePos = new Vector2(Mouse.GetState().X, Mouse.GetState().Y);
                _spriteBatch.DrawString(_gameFont, modeText, mousePos + new Vector2(15, 15), Color.Cyan);
             }
             
-            _spriteBatch.End();
-            
             // Enhancement UI (En üstte)
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
             _enhancementUI.Draw(_spriteBatch, _gameFont);
             _shopUI.Draw(_spriteBatch, _gameFont);
             
@@ -742,8 +842,20 @@ public class Game1 : Game
                 _spriteBatch.DrawString(_gameFont, interactText, textPos, Color.Yellow);
             }
             
-            _spriteBatch.End();
+            // Game Log Çiz
+            _gameLog.Draw(_spriteBatch, _gameFont);
+            
+            // Çanta Butonu Çiz
+            if (!_inventory.IsOpen && !_shopUI.IsOpen && !_enhancementUI.IsOpen) // Sadece UI kapalıyken veya her zaman? Genelde HUD parçasıdır.
+            {
+                Color bagTint = _isHoveringBag ? Color.White : new Color(220, 220, 220);
+                _spriteBatch.Draw(_bagButtonTexture, _bagButtonRect, bagTint);
+                // Tuş ipucu
+                 _spriteBatch.DrawString(_gameFont, "[I]", new Vector2(_bagButtonRect.X, _bagButtonRect.Y - 20), Color.White);
+            }
         }
+        
+        _spriteBatch.End();
 
         base.Draw(gameTime);
     }
@@ -824,7 +936,7 @@ public class Game1 : Game
         
         // 3. Merkeze (Map 1) Işınla
         LoadMap(1);
-        _player.SetPosition(new Vector2(_graphics.PreferredBackBufferWidth / 2f - 24, _graphics.PreferredBackBufferHeight / 2f - 32));
+        _player.SetPosition(new Vector2(MAP_WIDTH / 2f - 24, MAP_HEIGHT / 2f - 32));
         
         // 4. Bilgi Mesajı (Yeni map yüklendikten sonra ekle ki silinmesin)
         _damageNumbers.Add(new DamageNumber(
@@ -913,20 +1025,48 @@ public class Game1 : Game
         return texture;
     }
 
-    private Texture2D CreateDungeonFloor()
+    private Texture2D CreateDungeonFloor(int mapIndex)
     {
         int size = 64; // Her bir kare taşın boyutu
         Texture2D texture = new Texture2D(GraphicsDevice, size, size);
         Color[] data = new Color[size * size];
         Random rnd = new Random();
         
-        // Ana taş rengi (Koyu gri/Mavi tonlu)
-        Color baseColor = new Color(40, 45, 55);
+        // Temaya göre renkler
+        Color baseColor = new Color(40, 45, 55); // Map 1: Standart
+        Color jointColor = new Color(20, 20, 25);
+        Color highlightColor = new Color(60, 65, 75);
+        
+        if (mapIndex == 2)
+        {
+            // Map 2: Goblin (Yosunlu/Yeşilimsi)
+            baseColor = new Color(35, 45, 30);
+            jointColor = new Color(15, 25, 10);
+            highlightColor = new Color(50, 60, 45);
+        }
+        else if (mapIndex == 3)
+        {
+            // Map 3: Spider (Karanlık/Mor)
+            baseColor = new Color(25, 20, 30);
+            jointColor = new Color(10, 5, 15);
+            highlightColor = new Color(40, 35, 50);
+        }
+        else if (mapIndex == 4)
+        {
+            // Map 4: Demon (Alevli/Kırmızı)
+            baseColor = new Color(50, 20, 15);
+            jointColor = new Color(30, 10, 5);
+            highlightColor = new Color(70, 30, 25);
+        }
         
         for (int i = 0; i < size * size; i++)
         {
             // Hafif gürültü (Noise)
             int noise = rnd.Next(-5, 6);
+            
+            // Demon map için ekstra gürültü (lav efekti gibi)
+            if (mapIndex == 4 && rnd.Next(100) < 5) noise += 20;
+            
             data[i] = new Color(
                 Math.Clamp(baseColor.R + noise, 0, 255),
                 Math.Clamp(baseColor.G + noise, 0, 255),
@@ -934,24 +1074,24 @@ public class Game1 : Game
             );
         }
         
-        // Taş kenarlıkları (Derz) - Daha koyu
+        // Taş kenarlıkları (Derz)
         for (int x = 0; x < size; x++)
         {
-            data[x] = new Color(20, 20, 25); // Üst
-            data[(size-1)*size + x] = new Color(20, 20, 25); // Alt
+            data[x] = jointColor; // Üst
+            data[(size-1)*size + x] = jointColor; // Alt
             
-            // İç detay (Hafif 3D efekti için üst kenara açık renk)
+            // İç detay
             if(x > 0 && x < size-1)
-                data[size + x] = new Color(60, 65, 75); 
+                data[size + x] = highlightColor; 
         }
         for (int y = 0; y < size; y++)
         {
-            data[y*size] = new Color(20, 20, 25); // Sol
-            data[y*size + size-1] = new Color(20, 20, 25); // Sağ
+            data[y*size] = jointColor; // Sol
+            data[y*size + size-1] = jointColor; // Sağ
             
-            // İç detay (Sol kenara açık renk)
+            // İç detay
             if(y > 0 && y < size-1)
-                data[y*size + 1] = new Color(60, 65, 75);
+                data[y*size + 1] = highlightColor;
         }
         
         texture.SetData(data);

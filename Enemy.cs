@@ -264,40 +264,90 @@ public class Enemy
         }
         else if (Type == EnemyType.Spider)
         {
-             // --- SPIDER TEXTURE (Siyah/Mor, Çok bacaklı) ---
-             Color bodyColor = new Color(20, 20, 30);
-             Color legColor = new Color(40, 30, 40);
-             Color eyeColor = new Color(255, 0, 50); // Parlak kırmızı gözler
-             
-             for (int y = 0; y < _height; y++)
-             {
-                 for (int x = 0; x < _width; x++)
-                 {
-                     int i = y * _width + x;
-                     colors[i] = Color.Transparent;
-                     
-                     // Gövde (Abdomen)
-                     float distX = (x - centerX) * 1.0f;
-                     float distY = (y - (_height/2)) * 1.5f; // Basık
-                     if (distX*distX + distY*distY < 100) colors[i] = bodyColor;
-                     
-                     // Kafa
-                     if (x > centerX + 6 && x < centerX + 12 && y > _height/2 - 4 && y < _height/2 + 4)
-                         colors[i] = bodyColor;
-                         
-                     // Gözler
-                     if (x == centerX + 11 && (y == _height/2 - 2 || y == _height/2 + 2))
-                         colors[i] = eyeColor;
-                     
-                     // Bacaklar (Basit çizgiler)
-                     // 4 Sol, 4 Sağ
-                     if (Math.Abs(x - centerX) > 8)
-                     {
-                         // Bacak deseni (kabaca)
-                         if ((y % 6) < 2 && y > 4 && y < _height - 4) colors[i] = legColor;
-                     }
-                 }
-             }
+            // --- SPIDER TEXTURE (Gelişmiş) ---
+            Color abdomenColor = new Color(20, 15, 25); // Koyu Mor/Siyah Gövde
+            Color thoraxColor = new Color(30, 25, 35); // Kafa/Göğüs
+            Color legColor = new Color(10, 10, 15); // Bacaklar
+            Color eyeColor = new Color(200, 20, 20); // Gözler
+            Color patternColor = new Color(60, 20, 60); // Sırt deseni
+            
+            for (int y = 0; y < _height; y++)
+            {
+                for (int x = 0; x < _width; x++)
+                {
+                    int i = y * _width + x;
+                    colors[i] = Color.Transparent;
+                    
+                    float dx = x - centerX;
+                    float dy = y - _height / 2;
+                    
+                    // 1. ABDOMEN (Arka Gövde) - Büyük ve şişkin
+                    // Hafif aşağıda olsun
+                    float abY = dy - 4; 
+                    if ((dx*dx)/100 + (abY*abY)/120 < 1.0f) 
+                    {
+                        colors[i] = abdomenColor;
+                        
+                        // Sırtta "Kum saati" veya haç benzeri desen
+                        if (Math.Abs(dx) < 3 && Math.Abs(abY) < 6) colors[i] = patternColor;
+                    }
+                    
+                    // 2. THORAX (Kafa/Göğüs) - Daha küçük, önde
+                    float thY = dy + 8;
+                    if ((dx*dx)/36 + (thY*thY)/36 < 1.0f)
+                    {
+                        colors[i] = thoraxColor;
+                        
+                        // Gözler (Çoklu)
+                        if (thY > 1 && thY < 3)
+                        {
+                            if (Math.Abs(dx) == 2 || dx == 0) colors[i] = eyeColor;
+                        }
+                    }
+                    
+                    // 3. MANDIBLES (Kıskaçlar) - En önde
+                    if (y >= _height/2 + 13 && y < _height/2 + 16)
+                    {
+                        if (Math.Abs(dx) >= 1 && Math.Abs(dx) <= 2) colors[i] = new Color(80, 20, 20);
+                    }
+
+                    // 4. BACAKLAR (8 Adet, Eklemli)
+                    // Her iki tarafta 4'er bacak. Thorax'tan çıkmalı.
+                    
+                    // Sol Bacaklar
+                    if (dx < -4)
+                    {
+                        // Basit matematiksel eğrilerle bacak çizimi
+                        // Bacak 1 (En Ön)
+                        if (Math.Abs(y - (_height/2 + 10) - (dx + 5)*0.5f) < 1.5f && dx > -14) colors[i] = legColor;
+                        // Bacak 2
+                        if (Math.Abs(y - (_height/2 + 6) - (dx + 5)*0.2f) < 1.5f && dx > -16) colors[i] = legColor;
+                        // Bacak 3
+                        if (Math.Abs(y - (_height/2 + 2) - (dx + 5)*-0.2f) < 1.5f && dx > -16) colors[i] = legColor;
+                        // Bacak 4 (En Arka)
+                        if (Math.Abs(y - (_height/2 - 2) - (dx + 5)*-0.8f) < 1.5f && dx > -14) colors[i] = legColor;
+                        
+                        // Eklem yerleri (Dizler) - koyu noktalar
+                        if (dx == -12 && (y % 4 == 0)) colors[i] = Color.Black; 
+                    }
+                    
+                    // Sağ Bacaklar (Simetrik)
+                    if (dx > 4)
+                    {
+                        // Bacak 1 (En Ön)
+                        if (Math.Abs(y - (_height/2 + 10) - (-dx + 5)*0.5f) < 1.5f && dx < 14) colors[i] = legColor;
+                        // Bacak 2
+                        if (Math.Abs(y - (_height/2 + 6) - (-dx + 5)*0.2f) < 1.5f && dx < 16) colors[i] = legColor;
+                        // Bacak 3
+                        if (Math.Abs(y - (_height/2 + 2) - (-dx + 5)*-0.2f) < 1.5f && dx < 16) colors[i] = legColor;
+                        // Bacak 4 (En Arka)
+                        if (Math.Abs(y - (_height/2 - 2) - (-dx + 5)*-0.8f) < 1.5f && dx < 14) colors[i] = legColor;
+                        
+                         // Eklem yerleri
+                        if (dx == 12 && (y % 4 == 0)) colors[i] = Color.Black;
+                    }
+                }
+            }
         }
         else
         {

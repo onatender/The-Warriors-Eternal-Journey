@@ -382,13 +382,13 @@ public class EnhancementUI
         spriteBatch.DrawString(font, ">>", new Vector2(_windowBounds.Center.X - 10, iconY + 20), Color.Gray);
 
         // İstatistikler 
-        int statY = iconY + 70;
+        int statY = iconY + 90; // Daha aşağıya
         string statInfo = (_targetItem.Type == ItemType.Weapon) ? $"Hasar: +%20" : $"Defans: +%20";
         Vector2 statSize = font.MeasureString(statInfo);
         spriteBatch.DrawString(font, statInfo, new Vector2(_windowBounds.Center.X - statSize.X/2, statY), Color.LightGray);
         
         // Maliyetler
-        int infoY = statY + 30;
+        int infoY = statY + 35; // Boşluk arttı
         string costText = $"Tas: {_costStones} ({_inventory.GetItemCount(99)}) | Altin: {_costGold}";
         Color costColor = (_inventory.GetItemCount(99) >= _costStones && _player.Gold >= _costGold) ? Color.White : Color.Red;
         Vector2 costSz = font.MeasureString(costText);
@@ -431,7 +431,7 @@ public class EnhancementUI
         }
         string chanceText = $"Sans: %{totalChance}";
         Vector2 chanceSz = font.MeasureString(chanceText);
-        spriteBatch.DrawString(font, chanceText, new Vector2(_windowBounds.Center.X - chanceSz.X/2, infoY + 40), totalChance >= 50 ? Color.Lime : Color.Orange);
+        spriteBatch.DrawString(font, chanceText, new Vector2(_windowBounds.Center.X - chanceSz.X/2, infoY + 50), totalChance >= 50 ? Color.Lime : Color.Orange);
 
         // Buton
         if (!_isAnimating)

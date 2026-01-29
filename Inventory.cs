@@ -30,6 +30,20 @@ public class Inventory
     
     // Envanter durumu
     public bool IsOpen { get; private set; } = false;
+    
+    public void Open()
+    {
+        IsOpen = true;
+    }
+    
+    public void Close()
+    {
+        IsOpen = false;
+        // Seçim iptali vs. eklenmesi gerekirse buraya
+        _selectedSlot = null;
+        _hoveredSlot = new Point(-1, -1);
+    }
+    
     private int _currentPage = 0;
     
     // Slotlar - 4 sayfa x 64 slot
@@ -872,6 +886,19 @@ public class Inventory
                         SLOT_SIZE - 10
                     );
                     spriteBatch.Draw(slot.Item.Icon, iconRect, slot.Item.GetRarityColor());
+                    
+                    // Miktar Yazısı
+                    if (slot.Quantity > 1)
+                    {
+                        string qtyText = slot.Quantity.ToString();
+                        Vector2 qtySize = font.MeasureString(qtyText);
+                        Vector2 qtyPos = new Vector2(
+                            slotRect.Right - qtySize.X * 0.7f - 2, 
+                            slotRect.Bottom - qtySize.Y * 0.7f - 2
+                        );
+                        spriteBatch.DrawString(font, qtyText, qtyPos + new Vector2(1, 1), Color.Black, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
+                        spriteBatch.DrawString(font, qtyText, qtyPos, Color.White, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
+                    }
                 }
             }
         }

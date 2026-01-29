@@ -12,27 +12,31 @@ public class ShopUI
     
     private Texture2D _backgroundTexture;
     private Texture2D _slotTexture;
-    private Texture2D _buttonTexture;
     
     private int _screenWidth;
     private int _screenHeight;
     
-    private Rectangle _bounds;
-    private Vector2 _position;
+    // Panel pozisyonları
+    private Rectangle _playerPanelBounds;
+    private Rectangle _shopPanelBounds;
     
-    // Satılabilir itemlar (ItemDatabase'den)
+    // Slot boyutları
+    private const int SLOT_SIZE = 50;
+    private const int SLOT_PADDING = 5;
+    private const int GRID_COLS = 5;
+    private const int GRID_ROWS = 6;
+    
+    // Satıcının satılık item ID'leri
     private List<int> _shopItemIds = new List<int> { 1, 2, 3, 10, 11, 40, 41, 50, 51, 99, 20, 21, 22, 30, 31 };
     
-    // Scroll
-    private int _scrollOffset = 0;
-    private const int ITEMS_PER_PAGE = 6;
-    private const int SLOT_HEIGHT = 60;
-    
     // Hover
-    private int _hoveredItemIndex = -1;
-    private bool _hoveringBuy = false;
-    private bool _hoveringSell = false;
-    private int _sellHoveredIndex = -1;
+    private int _hoveredPlayerSlot = -1; // Hangi oyuncu slotuna hover edildi
+    private int _hoveredShopSlot = -1;   // Hangi satıcı slotuna hover edildi
+    
+    // Tooltip
+    private Item _tooltipItem = null;
+    private Vector2 _tooltipPosition;
+    private bool _showSellPrice = false; // Satış fiyatı mı alış fiyatı mı gösterilecek
     
     // Mevcut durumlar
     private Player _player;
@@ -41,10 +45,9 @@ public class ShopUI
     private MouseState _previousMouseState;
     private KeyboardState _previousKeyState;
     
-    // Tab
-    private int _currentTab = 0; // 0 = Buy, 1 = Sell
-    private Rectangle _buyTabRect;
-    private Rectangle _sellTabRect;
+    // Scroll
+    private int _playerScrollOffset = 0;
+    private int _shopScrollOffset = 0;
     
     public ShopUI(GraphicsDevice graphicsDevice, int screenWidth, int screenHeight)
     {
@@ -55,30 +58,48 @@ public class ShopUI
         _backgroundTexture = new Texture2D(graphicsDevice, 1, 1);
         _backgroundTexture.SetData(new[] { Color.White });
         
-        _slotTexture = new Texture2D(graphicsDevice, 1, 1);
-        _slotTexture.SetData(new[] { Color.White });
-        
-        _buttonTexture = new Texture2D(graphicsDevice, 1, 1);
-        _buttonTexture.SetData(new[] { Color.White });
+        _slotTexture = CreateSlotTexture(graphicsDevice);
         
         CalculatePosition();
     }
     
+    private Texture2D CreateSlotTexture(GraphicsDevice graphicsDevice)
+    {
+        int size = SLOT_SIZE;
+        Texture2D texture = new Texture2D(graphicsDevice, size, size);
+        Color[] colors = new Color[size * size];
+        
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                int i = y * size + x;
+                
+                // Kenar
+                if (x == 0 || y == 0 || x == size - 1 || y == size - 1)
+                    colors[i] = new Color(60, 65, 80);
+                // İç
+                else
+                    colors[i] = new Color(40, 45, 55);
+            }
+        }
+        
+        texture.SetData(colors);
+        return texture;
+    }
+    
     private void CalculatePosition()
     {
-        int width = 450;
-        int height = 500;
+        int panelWidth = GRID_COLS * (SLOT_SIZE + SLOT_PADDING) + 40;
+        int panelHeight = GRID_ROWS * (SLOT_SIZE + SLOT_PADDING) + 100;
+        int gap = 40;
         
-        _position = new Vector2(
-            (_screenWidth - width) / 2f,
-            (_screenHeight - height) / 2f
-        );
+        int totalWidth = panelWidth * 2 + gap;
+        int startX = (_screenWidth - totalWidth) / 2;
+        int startY = (_screenHeight - panelHeight) / 2;
         
-        _bounds = new Rectangle((int)_position.X, (int)_position.Y, width, height);
-        
-        // Tab butonları
-        _buyTabRect = new Rectangle((int)_position.X + 20, (int)_position.Y + 45, 100, 30);
-        _sellTabRect = new Rectangle((int)_position.X + 130, (int)_position.Y + 45, 100, 30);
+        _playerPanelBounds = new Rectangle(startX, startY, panelWidth, panelHeight);
+        _shopPanelBounds = new Rectangle(startX + panelWidth + gap, startY, panelWidth, panelHeight);
     }
     
     public void Open(Player player, Inventory inventory)
@@ -86,8 +107,8 @@ public class ShopUI
         _player = player;
         _inventory = inventory;
         IsOpen = true;
-        _scrollOffset = 0;
-        _currentTab = 0;
+        _playerScrollOffset = 0;
+        _shopScrollOffset = 0;
     }
     
     public void Close()
@@ -108,71 +129,53 @@ public class ShopUI
         
         Point mousePos = currentMouseState.Position;
         
-        // Tab hover
-        bool hoverBuyTab = _buyTabRect.Contains(mousePos);
-        bool hoverSellTab = _sellTabRect.Contains(mousePos);
+        // Hover kontrolü
+        _hoveredPlayerSlot = -1;
+        _hoveredShopSlot = -1;
+        _tooltipItem = null;
         
-        // Tab tıklama
+        // Oyuncu slotları hover
+        var playerItems = GetPlayerItems();
+        for (int i = 0; i < GRID_COLS * GRID_ROWS && i + _playerScrollOffset < playerItems.Count; i++)
+        {
+            Rectangle slotRect = GetPlayerSlotRect(i);
+            if (slotRect.Contains(mousePos))
+            {
+                _hoveredPlayerSlot = i + _playerScrollOffset;
+                _tooltipItem = playerItems[_hoveredPlayerSlot].item;
+                _tooltipPosition = new Vector2(mousePos.X + 15, mousePos.Y + 15);
+                _showSellPrice = true; // Oyuncu eşyası = satış fiyatı
+                break;
+            }
+        }
+        
+        // Satıcı slotları hover
+        for (int i = 0; i < GRID_COLS * GRID_ROWS && i + _shopScrollOffset < _shopItemIds.Count; i++)
+        {
+            Rectangle slotRect = GetShopSlotRect(i);
+            if (slotRect.Contains(mousePos))
+            {
+                _hoveredShopSlot = i + _shopScrollOffset;
+                _tooltipItem = ItemDatabase.GetItem(_shopItemIds[_hoveredShopSlot]);
+                _tooltipPosition = new Vector2(mousePos.X + 15, mousePos.Y + 15);
+                _showSellPrice = false; // Satıcı eşyası = alış fiyatı
+                break;
+            }
+        }
+        
+        // Tıklama
         if (currentMouseState.LeftButton == ButtonState.Pressed && 
             _previousMouseState.LeftButton == ButtonState.Released)
         {
-            if (hoverBuyTab) _currentTab = 0;
-            else if (hoverSellTab) _currentTab = 1;
-        }
-        
-        // Item hover ve tıklama
-        _hoveredItemIndex = -1;
-        _sellHoveredIndex = -1;
-        
-        int listStartY = (int)_position.Y + 90;
-        
-        if (_currentTab == 0) // BUY
-        {
-            for (int i = 0; i < ITEMS_PER_PAGE && i + _scrollOffset < _shopItemIds.Count; i++)
+            // Oyuncu slotuna tıklama = SAT
+            if (_hoveredPlayerSlot >= 0 && _hoveredPlayerSlot < playerItems.Count)
             {
-                Rectangle itemRect = new Rectangle(
-                    (int)_position.X + 20,
-                    listStartY + i * (SLOT_HEIGHT + 5),
-                    _bounds.Width - 40,
-                    SLOT_HEIGHT
-                );
-                
-                if (itemRect.Contains(mousePos))
-                {
-                    _hoveredItemIndex = i + _scrollOffset;
-                    
-                    // Tıklama - Satın Al
-                    if (currentMouseState.LeftButton == ButtonState.Pressed && 
-                        _previousMouseState.LeftButton == ButtonState.Released)
-                    {
-                        TryBuyItem(_shopItemIds[_hoveredItemIndex]);
-                    }
-                }
+                SellItem(playerItems[_hoveredPlayerSlot]);
             }
-        }
-        else // SELL
-        {
-            var sellableItems = GetSellableItems();
-            for (int i = 0; i < ITEMS_PER_PAGE && i + _scrollOffset < sellableItems.Count; i++)
+            // Satıcı slotuna tıklama = AL
+            else if (_hoveredShopSlot >= 0 && _hoveredShopSlot < _shopItemIds.Count)
             {
-                Rectangle itemRect = new Rectangle(
-                    (int)_position.X + 20,
-                    listStartY + i * (SLOT_HEIGHT + 5),
-                    _bounds.Width - 40,
-                    SLOT_HEIGHT
-                );
-                
-                if (itemRect.Contains(mousePos))
-                {
-                    _sellHoveredIndex = i + _scrollOffset;
-                    
-                    // Tıklama - Sat
-                    if (currentMouseState.LeftButton == ButtonState.Pressed && 
-                        _previousMouseState.LeftButton == ButtonState.Released)
-                    {
-                        TrySellItem(sellableItems[_sellHoveredIndex]);
-                    }
-                }
+                BuyItem(_shopItemIds[_hoveredShopSlot]);
             }
         }
         
@@ -180,20 +183,52 @@ public class ShopUI
         int scrollDelta = currentMouseState.ScrollWheelValue - _previousMouseState.ScrollWheelValue;
         if (scrollDelta != 0)
         {
-            _scrollOffset -= scrollDelta / 120;
-            int maxItems = _currentTab == 0 ? _shopItemIds.Count : GetSellableItems().Count;
-            _scrollOffset = Math.Clamp(_scrollOffset, 0, Math.Max(0, maxItems - ITEMS_PER_PAGE));
+            if (_playerPanelBounds.Contains(mousePos))
+            {
+                _playerScrollOffset -= scrollDelta / 120;
+                int maxScroll = Math.Max(0, playerItems.Count - GRID_COLS * GRID_ROWS);
+                _playerScrollOffset = Math.Clamp(_playerScrollOffset, 0, maxScroll);
+            }
+            else if (_shopPanelBounds.Contains(mousePos))
+            {
+                _shopScrollOffset -= scrollDelta / 120;
+                int maxScroll = Math.Max(0, _shopItemIds.Count - GRID_COLS * GRID_ROWS);
+                _shopScrollOffset = Math.Clamp(_shopScrollOffset, 0, maxScroll);
+            }
         }
         
         _previousKeyState = currentKeyState;
         _previousMouseState = currentMouseState;
     }
     
-    private List<(int page, int y, int x, Item item)> GetSellableItems()
+    private Rectangle GetPlayerSlotRect(int index)
+    {
+        int col = index % GRID_COLS;
+        int row = index / GRID_COLS;
+        return new Rectangle(
+            _playerPanelBounds.X + 20 + col * (SLOT_SIZE + SLOT_PADDING),
+            _playerPanelBounds.Y + 60 + row * (SLOT_SIZE + SLOT_PADDING),
+            SLOT_SIZE,
+            SLOT_SIZE
+        );
+    }
+    
+    private Rectangle GetShopSlotRect(int index)
+    {
+        int col = index % GRID_COLS;
+        int row = index / GRID_COLS;
+        return new Rectangle(
+            _shopPanelBounds.X + 20 + col * (SLOT_SIZE + SLOT_PADDING),
+            _shopPanelBounds.Y + 60 + row * (SLOT_SIZE + SLOT_PADDING),
+            SLOT_SIZE,
+            SLOT_SIZE
+        );
+    }
+    
+    private List<(int page, int y, int x, Item item)> GetPlayerItems()
     {
         var items = new List<(int, int, int, Item)>();
         
-        // Envanterdeki satılabilir itemları topla
         for (int p = 0; p < 4; p++)
         {
             for (int py = 0; py < 8; py++)
@@ -212,7 +247,7 @@ public class ShopUI
         return items;
     }
     
-    private void TryBuyItem(int itemId)
+    private void BuyItem(int itemId)
     {
         Item item = ItemDatabase.GetItem(itemId);
         if (item == null) return;
@@ -226,13 +261,12 @@ public class ShopUI
         }
     }
     
-    private void TrySellItem((int page, int y, int x, Item item) sellInfo)
+    private void SellItem((int page, int y, int x, Item item) sellInfo)
     {
         if (sellInfo.item == null) return;
         
         int sellPrice = sellInfo.item.SellPrice;
         
-        // Slottan sil
         var slot = _inventory.GetSlot(sellInfo.page, sellInfo.y, sellInfo.x);
         if (slot != null)
         {
@@ -252,147 +286,195 @@ public class ShopUI
             new Rectangle(0, 0, _screenWidth, _screenHeight), 
             new Color(0, 0, 0, 200));
         
-        // Ana panel
-        spriteBatch.Draw(_backgroundTexture, _bounds, new Color(30, 35, 45));
+        // Oyuncu paneli
+        DrawPanel(spriteBatch, _playerPanelBounds, "ESYALARIM", new Color(60, 80, 60));
         
-        // Başlık
-        string title = "SATICI";
-        Vector2 titleSize = font.MeasureString(title);
-        spriteBatch.DrawString(font, title, 
-            new Vector2(_position.X + (_bounds.Width - titleSize.X) / 2, _position.Y + 10),
-            new Color(255, 215, 100));
+        // Satıcı paneli
+        DrawPanel(spriteBatch, _shopPanelBounds, "SATICI", new Color(80, 60, 80));
         
-        // Altın göstergesi
+        // Altın göstergesi (ortada)
         string goldText = $"Altin: {_player.Gold} G";
-        spriteBatch.DrawString(font, goldText, 
-            new Vector2(_position.X + _bounds.Width - font.MeasureString(goldText).X - 20, _position.Y + 12),
-            Color.Gold, 0f, Vector2.Zero, 0.8f, SpriteEffects.None, 0f);
+        Vector2 goldSize = font.MeasureString(goldText);
+        Vector2 goldPos = new Vector2(
+            (_playerPanelBounds.Right + _shopPanelBounds.Left) / 2 - goldSize.X / 2,
+            _playerPanelBounds.Y + 30
+        );
+        spriteBatch.DrawString(font, goldText, goldPos + new Vector2(1, 1), Color.Black);
+        spriteBatch.DrawString(font, goldText, goldPos, Color.Gold);
         
-        // Tab butonları
-        Color buyTabColor = _currentTab == 0 ? new Color(80, 120, 80) : new Color(50, 55, 65);
-        Color sellTabColor = _currentTab == 1 ? new Color(120, 80, 80) : new Color(50, 55, 65);
-        
-        spriteBatch.Draw(_backgroundTexture, _buyTabRect, buyTabColor);
-        spriteBatch.Draw(_backgroundTexture, _sellTabRect, sellTabColor);
-        
-        spriteBatch.DrawString(font, "SATIN AL", 
-            new Vector2(_buyTabRect.X + 10, _buyTabRect.Y + 5), 
-            Color.White, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
-        spriteBatch.DrawString(font, "SAT", 
-            new Vector2(_sellTabRect.X + 30, _sellTabRect.Y + 5), 
-            Color.White, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
-        
-        // Item listesi
-        int listStartY = (int)_position.Y + 90;
-        
-        if (_currentTab == 0) // BUY
+        // Oyuncu itemlerini çiz
+        var playerItems = GetPlayerItems();
+        for (int i = 0; i < GRID_COLS * GRID_ROWS && i + _playerScrollOffset < playerItems.Count; i++)
         {
-            for (int i = 0; i < ITEMS_PER_PAGE && i + _scrollOffset < _shopItemIds.Count; i++)
+            int itemIndex = i + _playerScrollOffset;
+            var itemInfo = playerItems[itemIndex];
+            Rectangle slotRect = GetPlayerSlotRect(i);
+            
+            bool isHovered = _hoveredPlayerSlot == itemIndex;
+            Color slotColor = isHovered ? new Color(80, 100, 80) : Color.White;
+            
+            spriteBatch.Draw(_slotTexture, slotRect, slotColor);
+            
+            if (itemInfo.item.Icon != null)
             {
-                int itemId = _shopItemIds[i + _scrollOffset];
-                Item item = ItemDatabase.GetItem(itemId);
-                if (item == null) continue;
-                
-                Rectangle itemRect = new Rectangle(
-                    (int)_position.X + 20,
-                    listStartY + i * (SLOT_HEIGHT + 5),
-                    _bounds.Width - 40,
-                    SLOT_HEIGHT
-                );
-                
-                bool isHovered = _hoveredItemIndex == i + _scrollOffset;
-                bool canAfford = _player.Gold >= item.BuyPrice;
-                
-                Color bgColor = isHovered ? new Color(60, 65, 80) : new Color(40, 45, 55);
-                spriteBatch.Draw(_backgroundTexture, itemRect, bgColor);
-                
-                // İkon
-                if (item.Icon != null)
-                {
-                    spriteBatch.Draw(item.Icon, 
-                        new Rectangle(itemRect.X + 5, itemRect.Y + 5, 50, 50), 
-                        item.GetRarityColor());
-                }
-                
-                // İsim
-                spriteBatch.DrawString(font, item.GetDisplayName(), 
-                    new Vector2(itemRect.X + 60, itemRect.Y + 5), 
-                    item.GetRarityColor(), 0f, Vector2.Zero, 0.8f, SpriteEffects.None, 0f);
-                
-                // Fiyat
-                Color priceColor = canAfford ? Color.Gold : Color.Red;
-                spriteBatch.DrawString(font, $"{item.BuyPrice} G", 
-                    new Vector2(itemRect.X + 60, itemRect.Y + 30), 
-                    priceColor, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
-                
-                // Alınabilir mi?
-                if (isHovered)
-                {
-                    string hint = canAfford ? "[Tıkla: Satın Al]" : "[Yetersiz Altın]";
-                    spriteBatch.DrawString(font, hint, 
-                        new Vector2(itemRect.Right - font.MeasureString(hint).X * 0.6f - 10, itemRect.Y + 20), 
-                        canAfford ? Color.LightGreen : Color.Gray, 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
-                }
+                spriteBatch.Draw(itemInfo.item.Icon, 
+                    new Rectangle(slotRect.X + 5, slotRect.Y + 5, SLOT_SIZE - 10, SLOT_SIZE - 10),
+                    itemInfo.item.GetRarityColor());
+            }
+            
+            // Satış fiyatı göster (hover'da)
+            if (isHovered)
+            {
+                string price = $"+{itemInfo.item.SellPrice}G";
+                Vector2 priceSize = font.MeasureString(price) * 0.6f;
+                spriteBatch.DrawString(font, price, 
+                    new Vector2(slotRect.Right - priceSize.X - 2, slotRect.Bottom - 12),
+                    Color.LightGreen, 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
             }
         }
-        else // SELL
+        
+        // Satıcı itemlerini çiz
+        for (int i = 0; i < GRID_COLS * GRID_ROWS && i + _shopScrollOffset < _shopItemIds.Count; i++)
         {
-            var sellableItems = GetSellableItems();
+            int itemIndex = i + _shopScrollOffset;
+            int itemId = _shopItemIds[itemIndex];
+            Item item = ItemDatabase.GetItem(itemId);
+            if (item == null) continue;
             
-            if (sellableItems.Count == 0)
+            Rectangle slotRect = GetShopSlotRect(i);
+            
+            bool isHovered = _hoveredShopSlot == itemIndex;
+            bool canAfford = _player.Gold >= item.BuyPrice;
+            Color slotColor = isHovered ? (canAfford ? new Color(80, 80, 100) : new Color(100, 60, 60)) : Color.White;
+            
+            spriteBatch.Draw(_slotTexture, slotRect, slotColor);
+            
+            if (item.Icon != null)
             {
-                spriteBatch.DrawString(font, "Satilacak esya yok!", 
-                    new Vector2(_position.X + 120, listStartY + 100), 
-                    Color.Gray);
+                Color iconColor = canAfford ? item.GetRarityColor() : new Color(100, 100, 100);
+                spriteBatch.Draw(item.Icon, 
+                    new Rectangle(slotRect.X + 5, slotRect.Y + 5, SLOT_SIZE - 10, SLOT_SIZE - 10),
+                    iconColor);
             }
             
-            for (int i = 0; i < ITEMS_PER_PAGE && i + _scrollOffset < sellableItems.Count; i++)
-            {
-                var sellInfo = sellableItems[i + _scrollOffset];
-                Item item = sellInfo.item;
-                
-                Rectangle itemRect = new Rectangle(
-                    (int)_position.X + 20,
-                    listStartY + i * (SLOT_HEIGHT + 5),
-                    _bounds.Width - 40,
-                    SLOT_HEIGHT
-                );
-                
-                bool isHovered = _sellHoveredIndex == i + _scrollOffset;
-                
-                Color bgColor = isHovered ? new Color(80, 60, 60) : new Color(40, 45, 55);
-                spriteBatch.Draw(_backgroundTexture, itemRect, bgColor);
-                
-                // İkon
-                if (item.Icon != null)
-                {
-                    spriteBatch.Draw(item.Icon, 
-                        new Rectangle(itemRect.X + 5, itemRect.Y + 5, 50, 50), 
-                        item.GetRarityColor());
-                }
-                
-                // İsim
-                spriteBatch.DrawString(font, item.GetDisplayName(), 
-                    new Vector2(itemRect.X + 60, itemRect.Y + 5), 
-                    item.GetRarityColor(), 0f, Vector2.Zero, 0.8f, SpriteEffects.None, 0f);
-                
-                // Satış Fiyatı
-                spriteBatch.DrawString(font, $"+{item.SellPrice} G", 
-                    new Vector2(itemRect.X + 60, itemRect.Y + 30), 
-                    Color.LightGreen, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
-                
-                if (isHovered)
-                {
-                    spriteBatch.DrawString(font, "[Tıkla: Sat]", 
-                        new Vector2(itemRect.Right - 80, itemRect.Y + 20), 
-                        Color.LightCoral, 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
-                }
-            }
+            // Alış fiyatı göster
+            string price = $"{item.BuyPrice}G";
+            Color priceColor = canAfford ? Color.Gold : Color.Red;
+            Vector2 priceSize = font.MeasureString(price) * 0.55f;
+            spriteBatch.DrawString(font, price, 
+                new Vector2(slotRect.Right - priceSize.X - 2, slotRect.Bottom - 12),
+                priceColor, 0f, Vector2.Zero, 0.55f, SpriteEffects.None, 0f);
+        }
+        
+        // Tooltip çiz
+        if (_tooltipItem != null)
+        {
+            DrawTooltip(spriteBatch, font, _tooltipItem, _tooltipPosition, _showSellPrice);
         }
         
         // Kapatma ipucu
-        spriteBatch.DrawString(font, "[F] veya [ESC] Kapat", 
-            new Vector2(_position.X + 20, _position.Y + _bounds.Height - 25), 
-            new Color(150, 150, 150), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
+        string closeText = "[F] veya [ESC] Kapat";
+        spriteBatch.DrawString(font, closeText, 
+            new Vector2((_screenWidth - font.MeasureString(closeText).X * 0.7f) / 2, _shopPanelBounds.Bottom + 10),
+            new Color(150, 150, 150), 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
+        
+        // İpucu
+        string hintText = "Sol Tik: Sat/Al";
+        spriteBatch.DrawString(font, hintText, 
+            new Vector2((_screenWidth - font.MeasureString(hintText).X * 0.6f) / 2, _shopPanelBounds.Bottom + 30),
+            new Color(120, 120, 120), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
+    }
+    
+    private void DrawPanel(SpriteBatch spriteBatch, Rectangle bounds, string title, Color accentColor)
+    {
+        // Gölge
+        spriteBatch.Draw(_backgroundTexture, 
+            new Rectangle(bounds.X + 4, bounds.Y + 4, bounds.Width, bounds.Height),
+            new Color(0, 0, 0, 100));
+        
+        // Ana panel
+        spriteBatch.Draw(_backgroundTexture, bounds, new Color(30, 32, 40));
+        
+        // Başlık bar
+        Rectangle titleBar = new Rectangle(bounds.X, bounds.Y, bounds.Width, 40);
+        spriteBatch.Draw(_backgroundTexture, titleBar, accentColor);
+        
+        // Başlık
+        // Fontu kullanmak için parametre olarak almamız lazım - basit çözüm
+    }
+    
+    private void DrawTooltip(SpriteBatch spriteBatch, SpriteFont font, Item item, Vector2 position, bool showSellPrice)
+    {
+        string name = item.GetDisplayName();
+        string type = item.Type switch
+        {
+            ItemType.Weapon => "Silah",
+            ItemType.Armor => "Zirh",
+            ItemType.Shield => "Kalkan",
+            ItemType.Helmet => "Kask",
+            ItemType.Material => "Malzeme",
+            _ => "Esya"
+        };
+        
+        string stats = "";
+        if (item.Type == ItemType.Weapon)
+            stats = $"Hasar: {item.MinDamage}-{item.MaxDamage}";
+        else if (item.Type == ItemType.Armor || item.Type == ItemType.Helmet)
+            stats = $"Savunma: +{item.Defense} | Can: +{item.Health}";
+        else if (item.Type == ItemType.Shield)
+            stats = $"Savunma: +{item.Defense} | Blok: %{item.BlockChance}";
+        
+        string priceText = showSellPrice 
+            ? $"Satis Bedeli: {item.SellPrice}G" 
+            : $"Alis Bedeli: {item.BuyPrice}G";
+        
+        Color priceColor = showSellPrice ? Color.LightGreen : Color.Gold;
+        
+        float scale = 0.75f;
+        Vector2 nameSize = font.MeasureString(name) * scale;
+        Vector2 typeSize = font.MeasureString(type) * scale;
+        Vector2 statsSize = stats.Length > 0 ? font.MeasureString(stats) * scale : Vector2.Zero;
+        Vector2 priceSize = font.MeasureString(priceText) * scale;
+        
+        float maxWidth = Math.Max(Math.Max(nameSize.X, typeSize.X), Math.Max(statsSize.X, priceSize.X));
+        float totalHeight = nameSize.Y + typeSize.Y + (stats.Length > 0 ? statsSize.Y + 5 : 0) + priceSize.Y + 20;
+        
+        // Ekran sınırları
+        if (position.X + maxWidth + 20 > _screenWidth)
+            position.X = _screenWidth - maxWidth - 25;
+        if (position.Y + totalHeight > _screenHeight)
+            position.Y = _screenHeight - totalHeight - 10;
+        
+        Rectangle bgRect = new Rectangle(
+            (int)position.X - 5,
+            (int)position.Y - 5,
+            (int)maxWidth + 20,
+            (int)totalHeight + 10
+        );
+        
+        spriteBatch.Draw(_backgroundTexture, bgRect, new Color(20, 22, 30, 245));
+        
+        // Kenarlık
+        spriteBatch.Draw(_backgroundTexture, new Rectangle(bgRect.X, bgRect.Y, bgRect.Width, 1), new Color(80, 80, 100));
+        spriteBatch.Draw(_backgroundTexture, new Rectangle(bgRect.X, bgRect.Y, 1, bgRect.Height), new Color(80, 80, 100));
+        
+        float yOffset = 0;
+        spriteBatch.DrawString(font, name, position + new Vector2(0, yOffset), item.GetRarityColor(),
+            0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+        yOffset += nameSize.Y + 3;
+        
+        spriteBatch.DrawString(font, type, position + new Vector2(0, yOffset), new Color(150, 150, 150),
+            0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+        yOffset += typeSize.Y + 3;
+        
+        if (stats.Length > 0)
+        {
+            spriteBatch.DrawString(font, stats, position + new Vector2(0, yOffset), new Color(100, 200, 100),
+                0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            yOffset += statsSize.Y + 5;
+        }
+        
+        spriteBatch.DrawString(font, priceText, position + new Vector2(0, yOffset), priceColor,
+            0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
     }
 }

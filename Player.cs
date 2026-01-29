@@ -256,15 +256,47 @@ public class Player
     
     private void CreateTexture(GraphicsDevice graphicsDevice)
     {
-        _width = 40;
-        _height = 60;
+        _width = 48;
+        _height = 64;
         
         _texture = new Texture2D(graphicsDevice, _width, _height);
         Color[] colorData = new Color[_width * _height];
         
-        Color skinColor = new Color(245, 210, 180);
-        Color hairColor = new Color(50, 30, 20);
-        Color underwearColor = new Color(200, 200, 200); 
+        // Renk paleti
+        Color skinLight = new Color(255, 220, 190);
+        Color skinMid = new Color(235, 195, 160);
+        Color skinDark = new Color(200, 160, 130);
+        Color hairDark = new Color(45, 30, 20);
+        Color hairMid = new Color(65, 45, 30);
+        Color eyeColor = new Color(40, 80, 120);
+        
+        // Varsayılan giysi renkleri (zırh yoksa)
+        Color shirtMain = new Color(80, 60, 50);
+        Color shirtDark = new Color(60, 45, 35);
+        Color shirtLight = new Color(100, 75, 60);
+        
+        // Zırh varsa renkleri değiştir
+        if (_equippedArmor != null)
+        {
+            if (_equippedArmor.Id == 11) // Ejderha Zırhı
+            {
+                shirtMain = new Color(50, 15, 15);
+                shirtDark = new Color(30, 10, 10);
+                shirtLight = new Color(120, 30, 30);
+            }
+            else if (_equippedArmor.Id == 10) // Demir Zırh
+            {
+                shirtMain = new Color(140, 145, 160);
+                shirtDark = new Color(100, 105, 120);
+                shirtLight = new Color(180, 185, 200);
+            }
+            else // Deri/Kumaş
+            {
+                shirtMain = new Color(110, 80, 55);
+                shirtDark = new Color(85, 60, 40);
+                shirtLight = new Color(140, 100, 70);
+            }
+        }
         
         int centerX = _width / 2;
         
@@ -275,51 +307,120 @@ public class Player
                 int index = y * _width + x;
                 colorData[index] = Color.Transparent;
                 
-                // Kafa
-                if (y >= 4 && y < 18)
+                int dx = x - centerX;
+                
+                // ===== KAFA (y: 2-22) =====
+                if (y >= 2 && y < 22)
                 {
-                    if (Math.Abs(x - centerX) < 9)
+                    // Saç (üst kısım)
+                    if (y < 10)
                     {
-                        colorData[index] = skinColor;
-                        if (y < 8) colorData[index] = hairColor; 
-                        if (y >= 10 && y <= 12 && (Math.Abs(x - centerX) > 2 && Math.Abs(x - centerX) < 6))
-                             colorData[index] = Color.White; 
+                        // Saç şekli - daha geniş üstte
+                        int hairWidth = 11 - (y - 2) / 3;
+                        if (Math.Abs(dx) < hairWidth)
+                        {
+                            colorData[index] = (dx < 0) ? hairDark : hairMid;
+                            // Saç parlaklık
+                            if (y < 5 && dx > 1 && dx < 4) colorData[index] = hairMid;
+                        }
+                    }
+                    
+                    // Yüz
+                    if (y >= 8 && y < 22)
+                    {
+                        int faceWidth = y < 12 ? 9 : (y < 18 ? 8 : 7 - (y - 18) / 2);
+                        if (Math.Abs(dx) < faceWidth)
+                        {
+                            // Temel ten rengi
+                            colorData[index] = skinMid;
+                            
+                            // Sol taraf gölge
+                            if (dx < -3) colorData[index] = skinDark;
+                            // Sağ taraf parlak
+                            if (dx > 2 && dx < 5) colorData[index] = skinLight;
+                            
+                            // Gözler (y: 12-14)
+                            if (y >= 12 && y <= 14)
+                            {
+                                // Sol göz
+                                if (dx >= -5 && dx <= -3)
+                                {
+                                    colorData[index] = (y == 13) ? eyeColor : Color.White;
+                                    if (y == 13 && dx == -4) colorData[index] = Color.Black; // Göz bebeği
+                                }
+                                // Sağ göz  
+                                if (dx >= 2 && dx <= 4)
+                                {
+                                    colorData[index] = (y == 13) ? eyeColor : Color.White;
+                                    if (y == 13 && dx == 3) colorData[index] = Color.Black; // Göz bebeği
+                                }
+                            }
+                            
+                            // Burun (y: 15-17)
+                            if (y >= 15 && y <= 17 && dx >= -1 && dx <= 1)
+                            {
+                                colorData[index] = skinDark;
+                                if (dx == 0 && y == 16) colorData[index] = skinMid;
+                            }
+                            
+                            // Ağız (y: 19)
+                            if (y == 19 && Math.Abs(dx) < 3)
+                            {
+                                colorData[index] = new Color(180, 120, 110);
+                            }
+                        }
                     }
                 }
                 
-                // Gövde 
-                if (y >= 18 && y < 35)
+                // ===== BOYUN (y: 22-25) =====
+                if (y >= 22 && y < 25)
                 {
-                    if (Math.Abs(x - centerX) < 10)
+                    if (Math.Abs(dx) < 5)
                     {
-                         colorData[index] = skinColor;
-                         // Zırh
-                         if (_equippedArmor != null)
-                         {
-                             // ID 11 (Ejderha Zırhı) için koyu kırmızı/siyah
-                             if (_equippedArmor.Id == 11)
-                             {
-                                 colorData[index] = new Color(40, 10, 10); // Koyu zırh
-                                 if (Math.Abs(x - centerX) < 3) colorData[index] = new Color(100, 20, 20); // Orta detay
-                             }
-                             else
-                             {
-                                 colorData[index] = new Color(120, 80, 50); 
-                                 if (Math.Abs(x - centerX) < 2) colorData[index] = new Color(100, 60, 40); 
-                             }
-                         }
+                        colorData[index] = skinDark;
                     }
-                    // Kollar (Sadece Sol Kol - Arka Kol)
-                    // Sağ kolu (kılıç tutan) buraya çizmiyoruz, DrawWeapon'da çizeceğiz
-                    // Facing right (1) ise sol kol arkada kalır, görünebilir. Facing left ise tam tersi.
-                    // Basitlik için: Gövde texture'ında sadece "Diğer" kol kalsın veya ikisini de silelim, weapon tarafını dinamik çizelim.
-                    // Şimdilik texture üzerinde kolların olduğu kısmı siliyoruz, dinamik kol ekleyeceğiz.
-                    // (Mevcut kodda x >= 10 kısmı koldu, onu siliyoruz)
                 }
                 
-                // Bacaklar ARTIK BURADA ÇİZİLMİYOR (Ayrı texture ve animasyon var)
+                // ===== GÖVDE (y: 25-48) =====
+                if (y >= 25 && y < 48)
+                {
+                    // Omuz genişliği üstte daha geniş
+                    int bodyWidth = y < 30 ? 12 : (y < 40 ? 11 : 10);
+                    
+                    if (Math.Abs(dx) < bodyWidth)
+                    {
+                        colorData[index] = shirtMain;
+                        
+                        // Sol gölge
+                        if (dx < -bodyWidth + 3) colorData[index] = shirtDark;
+                        // Sağ parlaklık
+                        if (dx > bodyWidth - 4) colorData[index] = shirtLight;
+                        
+                        // Orta dikey çizgi (giysi detayı)
+                        if (Math.Abs(dx) < 2 && y > 28)
+                        {
+                            colorData[index] = shirtDark;
+                        }
+                        
+                        // Kemer (y: 42-45)
+                        if (y >= 42 && y < 46)
+                        {
+                            colorData[index] = new Color(60, 45, 30);
+                            if (y == 43) colorData[index] = new Color(80, 60, 40);
+                            // Kemer tokası
+                            if (Math.Abs(dx) < 3 && y >= 43 && y <= 44)
+                            {
+                                colorData[index] = new Color(180, 160, 80);
+                            }
+                        }
+                    }
+                }
+                
+                // ===== BACAKLAR (y: 48-62) - Basit placeholder =====
+                // (Bacaklar ayrı texture ile çiziliyor, bu sadece dolgu)
             }
         }
+        
         _texture.SetData(colorData);
     }
     
@@ -482,7 +583,7 @@ public class Player
         CreateLegTexture(_graphicsDevice); // Bacakları güncelle
     }
     
-    public void Update(GameTime gameTime, int screenWidth, int screenHeight)
+    public void Update(GameTime gameTime, int mapWidth, int mapHeight)
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         KeyboardState keyState = Keyboard.GetState();
@@ -511,7 +612,7 @@ public class Player
         if (_velocity != Vector2.Zero) _velocity.Normalize();
         
         _position += _velocity * _speed * deltaTime;
-        _position.X = MathHelper.Clamp(_position.X, 0, screenWidth - _width);
+        _position.X = MathHelper.Clamp(_position.X, 0, mapWidth - _width);
         // Y eksenini kısıtlamıyoruz ki harita değiştirebilelim
         // _position.Y = MathHelper.Clamp(_position.Y, 0, screenHeight - _height);
         
@@ -679,60 +780,44 @@ public class Player
     
     private void DrawWeapon(SpriteBatch spriteBatch, Vector2 bodyPos)
     {
-        // Omuz Pozisyonu (Gövdeye göre ön omuz)
-        float shoulderOffsetX = _facingDirection == 1 ? _width - 10 : 10;
-        float shoulderOffsetY = 22; 
+        // Omuz Pozisyonu (Gövde kenarı) 
+        // Genişlik 48, Orta 24, Gövde yarıçapı ~12 => Sağ omuz 36, Sol omuz 12
+        float shoulderOffsetX = _facingDirection == 1 ? 36 : 12;
+        float shoulderOffsetY = 26; 
         Vector2 shoulderPos = bodyPos + new Vector2(shoulderOffsetX, shoulderOffsetY);
         
-        // Temel Rotasyon (Silahı öne doğru tutsun)
-        float baseRotation = _facingDirection == 1 ? -0.5f : 0.5f; 
+        // --- KOL ROTASYONU ---
+        // Silahı vücuttan uzakta tutması için kolu dışarı/aşağı doğru açıyoruz
+        // 0 = Aşağı, -1.0 = Sağ-Aşağı (Sağ el için), 1.0 = Sol-Aşağı (Sol el için)
+        float baseRotation = _facingDirection == 1 ? -1.0f : 1.0f; 
         
-        // Saldırı animasyonu
+        // Saldırı animasyonu (Vurunca kol hareket etsin)
         float animationRot = 0f;
-        
         if (_isAttacking)
         {
-            // Vurma hareketi (Yukarıdan aşağıya veya savurma)
-            // Timer 0 -> PI. Sinus kullanırsak 0 -> 1 -> 0 olur.
-            // Bize savurma lazım: -Arkadan -> +Öne
-            
-            // Cosinüs: 1 -> -1 (PI süresince)
-            float t = _attackTimer / MathF.PI; // 0.0 -> 1.0
-            
-            // Swing: Başlangıç açısı -> Bitiş açısı
-            // Facing 1: -2.5 (Geri-Yukarı) -> 1.5 (İleri-Aşağı)
-            float startAngle = -2.5f;
-            float endAngle = 1.5f;
-            
-            if (_facingDirection == -1) // Ters
-            {
-                startAngle = 2.5f;
-                endAngle = -1.5f;
-            }
-            
-            // Lerp
+            float t = _attackTimer / MathF.PI; 
+            float startAngle = _facingDirection == 1 ? -2.5f : 2.5f; // Yukarıdan
+            float endAngle = _facingDirection == 1 ? 1.5f : -1.5f;   // Aşağıya
             baseRotation = MathHelper.Lerp(startAngle, endAngle, t);
             
-            // Sweep Efekti
+            // Sweep Efekti - EKLENDİ
             if (_sweepTexture != null)
             {
                  // Sweep konumu silaha göre
-                 Vector2 sweepOffset = new Vector2(MathF.Sin(baseRotation), -MathF.Cos(baseRotation)) * 30f; 
+                 Vector2 sweepOffset = new Vector2(MathF.Sin(baseRotation), -MathF.Cos(baseRotation)) * 36f; 
                  // Rotasyon düzeltmesi
                  float sweepRot = baseRotation + (_facingDirection == 1 ? -MathF.PI/4 : MathF.PI/4);
 
-                 Vector2 sweepPos = shoulderPos + new Vector2(_facingDirection * 10, 0); // Omuzdan biraz önde
-                 spriteBatch.Draw(_sweepTexture, sweepPos, null, Color.White * 0.8f, sweepRot, new Vector2(32,32), 2.5f, SpriteEffects.None, 0f);
+                 Vector2 sweepPos = shoulderPos + new Vector2(_facingDirection * 15, 0); // Omuzdan biraz önde
+                 spriteBatch.Draw(_sweepTexture, sweepPos, null, Color.White * 0.8f, sweepRot, new Vector2(32,32), 2.0f, SpriteEffects.None, 0f);
             }
         }
         else if (_isMoving)
         {
-            // Koşarken sallasın
             animationRot = MathF.Sin(_animationTimer) * 0.3f;
         }
         else
         {
-            // Idle
             animationRot = MathF.Sin(_animationTimer * 0.2f) * 0.05f;
         }
         
@@ -747,19 +832,32 @@ public class Player
         }
         
         // --- SİLAHI ÇİZ ---
-        // Silah kolun ucunda
-        // Kol uzunluğu 16px (Texture yüksekliği)
-        
         Matrix mat = Matrix.CreateRotationZ(finalRotation);
-        Vector2 armEndOffset = Vector2.Transform(new Vector2(0, 14), mat); // Kolun ucu
-             
+        Vector2 armEndOffset = Vector2.Transform(new Vector2(0, 14), mat); 
         Vector2 handPos = shoulderPos + armEndOffset;
         
-        // Silahın sapı (Origin)
+        // Silahın sapı (Origin) - Alt orta
         Vector2 weaponOrigin = new Vector2(_weaponTexture.Width / 2, _weaponTexture.Height - 6);
         
-        // Silah rotasyonu kolla aynı + biraz açı (kılıç dik değil, uzantısı gibi)
-        float weaponRot = finalRotation + (_facingDirection == 1 ? -0.2f : 0.2f);
+        // --- SİLAH ROTASYONU ---
+        // Kılıç her zaman yukarı baksın (Hafif dışarı eğimli)
+        // Kolun açısı ne olursa olsun kılıcı dik tutmaya çalışsın (saldırı hariç)
+        float weaponRot;
+        
+        if (_isAttacking)
+        {
+            // Saldırırken kılıç kolu takip etsin (kesme hareketi için)
+            weaponRot = finalRotation;
+        }
+        else
+        {
+            // Normal duruşta kılıç yukarı baksın (0 = Yukarı/Aşağı? Texture dikey olduğu için 0 dikey)
+            // Hafif dışarı eğim verelim: Sağ için +0.2, Sol için -0.2
+            weaponRot = _facingDirection == 1 ? 0.2f : -0.2f;
+            
+            // Koşarken kılıç da hafif sallansın
+            weaponRot += animationRot * 0.5f;
+        }
         
         spriteBatch.Draw(_weaponTexture, handPos, null, Color.White, weaponRot, weaponOrigin, 1f, SpriteEffects.None, 0f);
     }

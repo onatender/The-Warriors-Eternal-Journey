@@ -547,7 +547,15 @@ public static class ItemDatabase
         Texture2D texture = new Texture2D(graphicsDevice, size, size);
         Color[] colors = new Color[size * size];
         
-        // Kılıç şekli çiz
+        // Renkler
+        Color silver = new Color(200, 200, 220);
+        Color darkSilver = new Color(120, 120, 140);
+        Color handleColor = new Color(90, 60, 40);
+        Color guardColor = new Color(190, 170, 60);
+        
+        // Eğer bladeColor özel bir renkse (örn Efsanevi), onu kullan
+        bool isSpecial = bladeColor != Color.Gray; 
+        
         for (int y = 0; y < size; y++)
         {
             for (int x = 0; x < size; x++)
@@ -555,32 +563,38 @@ public static class ItemDatabase
                 int i = y * size + x;
                 colors[i] = Color.Transparent;
                 
-                // Kılıç gövdesi (çapraz)
-                int bladeWidth = 4;
-                int diff = Math.Abs((size - 1 - y) - x);
+                // Dikey Kılıç (Ortada)
+                int cx = size / 2;
                 
-                if (diff < bladeWidth && x > 5 && x < size - 8 && y > 5 && y < size - 8)
+                // Kabza (Sap)
+                if (x >= cx - 1 && x <= cx + 1 && y >= size - 8 && y < size - 2)
                 {
-                    // Blade gradient
-                    float gradient = 1f - (float)diff / bladeWidth;
-                    colors[i] = new Color(
-                        (int)(bladeColor.R * gradient + 50),
-                        (int)(bladeColor.G * gradient + 30),
-                        (int)(bladeColor.B * gradient + 10)
-                    );
+                    colors[i] = handleColor;
+                    if (y == size - 3) colors[i] = guardColor; // Pommel
                 }
                 
-                // Kabza (sağ alt köşe)
-                if (x >= size - 12 && x <= size - 5 && y >= size - 12 && y <= size - 5)
+                // Koruma (Guard)
+                if (y >= size - 12 && y < size - 8)
                 {
-                    // Kabza
-                    colors[i] = new Color(80, 60, 40);
+                    if (Math.Abs(x - cx) <= 5) colors[i] = guardColor;
                 }
                 
-                // Koruma (crossguard)
-                if (y >= size / 2 - 2 && y <= size / 2 + 2 && x >= size / 2 - 6 && x <= size / 2 + 6)
+                // Bıçak (Blade)
+                if (y < size - 12 && y > 2)
                 {
-                    colors[i] = new Color(100, 80, 60);
+                    if (Math.Abs(x - cx) <= 2)
+                    {
+                        colors[i] = isSpecial ? bladeColor : silver;
+                        
+                        // Ortadaki oluk veya parlaklık
+                        if (x == cx) colors[i] = isSpecial ? Color.White : new Color(240, 240, 255);
+                        
+                        // Kenar gölgeleri
+                        if (Math.Abs(x - cx) == 2) colors[i] = isSpecial ? new Color(bladeColor.R/2, bladeColor.G/2, bladeColor.B/2) : darkSilver;
+                    }
+                    
+                    // Uç kısmı sivriltme
+                    if (y < 6 && Math.Abs(x - cx) > (y-2)/2) colors[i] = Color.Transparent;
                 }
             }
         }
