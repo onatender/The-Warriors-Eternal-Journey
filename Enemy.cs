@@ -8,7 +8,8 @@ namespace EternalJourney;
 public enum EnemyType
 {
     Demon,  // Güçlü, Tridentli
-    Goblin  // Zayıf, Hızlı
+    Goblin,  // Zayıf, Hızlı
+    Spider  // Orta, Hızlı
 }
 
 public enum EnemyState
@@ -93,6 +94,11 @@ public class Enemy
         CreateTexture(graphicsDevice);
         if (Type == EnemyType.Demon)
             CreateTridentTexture(graphicsDevice);
+        else if (Type == EnemyType.Spider)
+        {
+            // Silah texture'ı yok
+             _weaponTexture = null;
+        }
         else 
             CreateDaggerTexture(graphicsDevice);
     }
@@ -112,6 +118,21 @@ public class Enemy
             _aggroRadius = 250f;
             _attackRadius = 60f;
             _attackCooldown = 2.5f;
+            _attackCooldown = 2.5f;
+        }
+        else if (Type == EnemyType.Spider)
+        {
+            // Örümcek - Hızlı ve Zehirli (Zehir logic yok ama hızlı)
+            _width = 48;
+            _height = 32; // Basık
+            MaxHealth = 120;
+            CurrentHealth = MaxHealth;
+            MinDamage = 5;
+            MaxDamage = 10;
+            _speed = 140f; 
+            _aggroRadius = 200f;
+            _attackRadius = 45f;
+            _attackCooldown = 1.2f;
         }
         else // Goblin
         {
@@ -240,6 +261,43 @@ public class Enemy
                     }
                 }
             }
+        }
+        else if (Type == EnemyType.Spider)
+        {
+             // --- SPIDER TEXTURE (Siyah/Mor, Çok bacaklı) ---
+             Color bodyColor = new Color(20, 20, 30);
+             Color legColor = new Color(40, 30, 40);
+             Color eyeColor = new Color(255, 0, 50); // Parlak kırmızı gözler
+             
+             for (int y = 0; y < _height; y++)
+             {
+                 for (int x = 0; x < _width; x++)
+                 {
+                     int i = y * _width + x;
+                     colors[i] = Color.Transparent;
+                     
+                     // Gövde (Abdomen)
+                     float distX = (x - centerX) * 1.0f;
+                     float distY = (y - (_height/2)) * 1.5f; // Basık
+                     if (distX*distX + distY*distY < 100) colors[i] = bodyColor;
+                     
+                     // Kafa
+                     if (x > centerX + 6 && x < centerX + 12 && y > _height/2 - 4 && y < _height/2 + 4)
+                         colors[i] = bodyColor;
+                         
+                     // Gözler
+                     if (x == centerX + 11 && (y == _height/2 - 2 || y == _height/2 + 2))
+                         colors[i] = eyeColor;
+                     
+                     // Bacaklar (Basit çizgiler)
+                     // 4 Sol, 4 Sağ
+                     if (Math.Abs(x - centerX) > 8)
+                     {
+                         // Bacak deseni (kabaca)
+                         if ((y % 6) < 2 && y > 4 && y < _height - 4) colors[i] = legColor;
+                     }
+                 }
+             }
         }
         else
         {
@@ -697,6 +755,11 @@ public class EnemyManager
         var group = new EnemyGroup(_graphicsDevice, position, type, count);
         group.OnEnemyAttackPlayer += (damage) => OnPlayerDamaged?.Invoke(damage);
         _groups.Add(group);
+    }
+
+    public void ClearGroups()
+    {
+        _groups.Clear();
     }
     
     public void Update(GameTime gameTime, Vector2 playerPosition, Rectangle playerBounds)

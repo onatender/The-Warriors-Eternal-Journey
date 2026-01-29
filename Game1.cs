@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Audio;
 
 namespace EternalJourney;
 
@@ -34,12 +35,33 @@ public class Game1 : Game
     private Texture2D _magicCursorTexture; // Mod için
     
     // Tam ekran toggle için
+    // Tam ekran toggle için
     private KeyboardState _previousKeyState;
+
+    // SFX
+    private SoundEffect _sfxSlice1;
+    private SoundEffect _sfxSlice2;
+    private SoundEffect _sfxClash;
     
     // Login ve Save
     private GameState _currentState = GameState.Login;
     private string _playerName = "";
     private KeyboardState _currentKeyState;
+
+    // Harita Sistemi
+    private int _currentMapIndex = 1;
+    private const int MAX_MAPS = 4;
+    
+    // Ölüm Sistemi
+    private bool _playerNeedsRespawn = false;
+    private int _pendingDeathPenalty = 0;
+    
+    // Satıcı NPC Sistemi
+    private ShopUI _shopUI;
+    private Vector2 _vendorPosition;
+    private Texture2D _vendorTexture;
+    private bool _nearVendor = false;
+    private const float VENDOR_INTERACTION_RANGE = 100f;
 
     public Game1()
     {
@@ -139,6 +161,32 @@ public class Game1 : Game
                  }
              }
              
+             if (data.EquippedShield != null && data.EquippedShield.ItemId > 0) 
+             {
+                 Item shield = ItemDatabase.GetItem(data.EquippedShield.ItemId);
+                 if (shield != null)
+                 {
+                     for(int i=0; i<data.EquippedShield.EnhancementLevel; i++) shield.UpgradeSuccess();
+                     
+                     _player.EquipShield(shield);
+                     _inventory.ShieldSlot.Item = shield;
+                     _inventory.ShieldSlot.Quantity = 1;
+                 }
+             }
+             
+             if (data.EquippedHelmet != null && data.EquippedHelmet.ItemId > 0) 
+             {
+                 Item helmet = ItemDatabase.GetItem(data.EquippedHelmet.ItemId);
+                 if (helmet != null)
+                 {
+                     for(int i=0; i<data.EquippedHelmet.EnhancementLevel; i++) helmet.UpgradeSuccess();
+                     
+                     _player.EquipHelmet(helmet);
+                     _inventory.HelmetSlot.Item = helmet;
+                     _inventory.HelmetSlot.Quantity = 1;
+                 }
+             }
+             
              // Pozisyon - Player constructorında window center kullanılıyor. Kayıtlı pozisyonu yüklemek için:
              // Şimdilik pas geçiyoruz (kullanıcının orijinal kodunda kapalıydı)
         }
@@ -178,6 +226,16 @@ public class Game1 : Game
             if (a != null)
                 savedArmor = new SavedItem { ItemId = a.Id, Quantity = 1, EnhancementLevel = a.EnhancementLevel };
 
+            SavedItem savedShield = null;
+            var sh = _player.GetEquippedShield();
+            if (sh != null)
+                savedShield = new SavedItem { ItemId = sh.Id, Quantity = 1, EnhancementLevel = sh.EnhancementLevel };
+
+            SavedItem savedHelmet = null;
+            var h = _player.GetEquippedHelmet();
+            if (h != null)
+                savedHelmet = new SavedItem { ItemId = h.Id, Quantity = 1, EnhancementLevel = h.EnhancementLevel };
+
             // Kaydet
             SaveData data = new SaveData
             {
@@ -191,7 +249,9 @@ public class Game1 : Game
                 Gold = _player.Gold, 
                 InventoryItems = _inventory.GetItemsForSave(),
                 EquippedWeapon = savedWeapon,
-                EquippedArmor = savedArmor
+                EquippedArmor = savedArmor,
+                EquippedShield = savedShield,
+                EquippedHelmet = savedHelmet
             };
             
             SaveManager.SaveGame(data);
@@ -220,6 +280,9 @@ public class Game1 : Game
         // Oyuncu saldırı event'i
         _player.OnAttackHit += (enemy, damage) =>
         {
+            // Oynat Clash Sesi
+            _sfxClash?.Play(0.3f, 0.0f, 0.0f);
+
             // Hasar sayısı ekle
             _damageNumbers.Add(new DamageNumber(
                 enemy.Position + new Vector2(0, -30),
@@ -294,6 +357,8 @@ public class Game1 : Game
         // Envanter event'lerini bağla
         _inventory.OnWeaponEquipped += (weapon) => _player.EquipWeapon(weapon);
         _inventory.OnArmorEquipped += (armor) => _player.EquipArmor(armor);
+        _inventory.OnShieldEquipped += (shield) => _player.EquipShield(shield);
+        _inventory.OnHelmetEquipped += (helmet) => _player.EquipHelmet(helmet);
         _inventory.OnEnhancementTargetSelected += (item) => 
         {
             _enhancementUI.Open(item, _player, _inventory);
@@ -304,49 +369,118 @@ public class Game1 : Game
             _graphics.PreferredBackBufferWidth,
             _graphics.PreferredBackBufferHeight);
         
+        // Shop UI ve Satıcı NPC
+        _shopUI = new ShopUI(GraphicsDevice,
+            _graphics.PreferredBackBufferWidth,
+            _graphics.PreferredBackBufferHeight);
+        _vendorPosition = new Vector2(200, 300); // Map 1'de sabit pozisyon
+        _vendorTexture = CreateVendorTexture(GraphicsDevice);
+        
         // Enemy Manager oluştur
         _enemyManager = new EnemyManager(GraphicsDevice);
         
         // Cursor Textures (Basitçe pixelden oluşturuyoruz veya yüklüyoruz)
         // Cursor için basit bir logic ekleyeceğiz, texture yerine.
+
+        // SFX Yukle
+        try 
+        {
+            _sfxSlice1 = Content.Load<SoundEffect>("SFX/sword_slice_1");
+            _sfxSlice2 = Content.Load<SoundEffect>("SFX/sword_slice_2");
+            _sfxClash = Content.Load<SoundEffect>("SFX/sword_clash");
+            var sfxWalk = Content.Load<SoundEffect>("SFX/walk");
+            
+            _player.SetCombatSounds(_sfxSlice1, _sfxSlice2);
+            _player.SetWalkSound(sfxWalk);
+        }
+        catch(System.Exception e) 
+        {
+            System.Diagnostics.Debug.WriteLine("SFX Load Error: " + e.Message);
+        }
         
         // Düşman saldırı event'i - oyuncu hasar alınca
         _enemyManager.OnPlayerDamaged += (damage) =>
         {
-            _player.TakeDamage(damage);
+            // BLOKLAMA KONTROLÜ (Rastgele, Kalkan varsa)
+            if (_player.TryBlock())
+            {
+                // Bloklandı! Hasar yok
+                _damageNumbers.Add(new DamageNumber(
+                    _player.Center + new Vector2(0, -40),
+                    0,
+                    new Color(100, 150, 255) // Mavi
+                ) { CustomText = "BLOKLANDI!" });
+                return; // Hasar işlemini atla
+            }
+            
+            // SAVUNMA İLE HASAR AZALTMA
+            int totalDefense = _player.GetTotalDefense();
+            int actualDamage = Math.Max(1, damage - totalDefense); // Minimum 1 hasar
+            
+            _player.TakeDamage(actualDamage);
             
             // Kırmızı hasar sayısı
             _damageNumbers.Add(new DamageNumber(
                 _player.Center + new Vector2(0, -40),
-                damage,
+                actualDamage,
                 new Color(255, 80, 80) // Kırmızı
             ));
+            
+            // ÖLÜM KONTROLÜ
+            if (_player.CurrentHealth <= 0)
+            {
+                // İşlemi hemen yapma, bayrağı kaldır (Update başında yapacağız)
+                _pendingDeathPenalty = (int)(_player.Gold * 0.10f);
+                _playerNeedsRespawn = true;
+            }
         };
         
-        // Düşman gruplarını spawn et (haritanın farklı yerlerinde)
-        SpawnEnemyGroups();
+        // İlk Haritayı Yükle
+        LoadMap(1);
     }
     
-    private void SpawnEnemyGroups()
+    private void LoadMap(int mapIndex)
     {
+        _currentMapIndex = mapIndex;
+        _enemyManager.ClearGroups();
+        _damageNumbers.Clear(); // Yerdeki paralar/yazılar silinsin mi? Evet, yeni map.
+        
         int screenWidth = GraphicsDevice.Viewport.Width;
         int screenHeight = GraphicsDevice.Viewport.Height;
         
-        // --- Şeytanlar (Zorlu düşmanlar - daha az sayıda) ---
-        // Üst orta
-        _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.5f, screenHeight * 0.2f), EnemyType.Demon, 2);
-        // Alt orta
-        _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.5f, screenHeight * 0.8f), EnemyType.Demon, 2);
-        
-        // --- Goblinler (Kolay düşmanlar - kalabalık) ---
-        // Sol taraf
-        _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.15f, screenHeight * 0.5f), EnemyType.Goblin, 5);
-        // Sağ taraf
-        _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.85f, screenHeight * 0.5f), EnemyType.Goblin, 5);
-        
-        // Köşeler
-        _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.1f, screenHeight * 0.1f), EnemyType.Goblin, 3);
-        _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.9f, screenHeight * 0.9f), EnemyType.Goblin, 3);
+        if (mapIndex == 1)
+        {
+            // --- MAP 1: SAFE ZONE ---
+            // Sadece NPC'ler (şimdilik boş)
+        }
+        else if (mapIndex == 2)
+        {
+            // --- MAP 2: GOBLINS ---
+            // Sol ve Sağ, Dağınık
+             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.2f, screenHeight * 0.4f), EnemyType.Goblin, 3);
+             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.8f, screenHeight * 0.6f), EnemyType.Goblin, 3);
+             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.5f, screenHeight * 0.5f), EnemyType.Goblin, 4);
+        }
+        else if (mapIndex == 3)
+        {
+             // --- MAP 3: SPIDERS ---
+             // Köşeler
+             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.1f, screenHeight * 0.1f), EnemyType.Spider, 2);
+             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.9f, screenHeight * 0.1f), EnemyType.Spider, 2);
+             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.1f, screenHeight * 0.9f), EnemyType.Spider, 2);
+             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.9f, screenHeight * 0.9f), EnemyType.Spider, 2);
+             
+             // Orta
+             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.5f, screenHeight * 0.5f), EnemyType.Spider, 3);
+        }
+        else if (mapIndex == 4)
+        {
+             // --- MAP 4: DEMONS ---
+             // Zorlu
+             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.5f, screenHeight * 0.3f), EnemyType.Demon, 2);
+             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.3f, screenHeight * 0.7f), EnemyType.Demon, 2);
+             _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.7f, screenHeight * 0.7f), EnemyType.Demon, 2);
+        }
     }
 
     protected override void Update(GameTime gameTime)
@@ -382,12 +516,44 @@ public class Game1 : Game
         // --- GAME PLAYING ---
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
+        // Ölüm gerçekleştiyse güvenli yerde respawn yap
+        if (_playerNeedsRespawn)
+        {
+            _playerNeedsRespawn = false;
+            HandlePlayerDeath();
+            return; // Bu frame'i atla
+        }
+
         // Enhancement UI açıkken alt tarafı update etme
         if (_enhancementUI.IsOpen)
         {
             _enhancementUI.Update(gameTime);
             base.Update(gameTime);
             return;
+        }
+        
+        // Shop UI açıkken alt tarafı update etme
+        if (_shopUI.IsOpen)
+        {
+            IsMouseVisible = true; // Mouse görünür olsun
+            _shopUI.Update(gameTime, currentKeyState, currentMouseState);
+            _previousKeyState = currentKeyState;
+            base.Update(gameTime);
+            return;
+        }
+        
+        // Satıcı NPC Yakınlık Kontrolü (Sadece Map 1'de)
+        _nearVendor = false;
+        if (_currentMapIndex == 1)
+        {
+            float distToVendor = Vector2.Distance(_player.Center, _vendorPosition + new Vector2(24, 32));
+            _nearVendor = distToVendor < VENDOR_INTERACTION_RANGE;
+            
+            // F tuşu ile satıcıyı aç
+            if (_nearVendor && currentKeyState.IsKeyDown(Keys.F) && !_previousKeyState.IsKeyDown(Keys.F))
+            {
+                _shopUI.Open(_player, _inventory);
+            }
         }
 
         if (currentKeyState.IsKeyDown(Keys.Escape) && !_previousKeyState.IsKeyDown(Keys.Escape))
@@ -410,6 +576,36 @@ public class Game1 : Game
            _player.Update(gameTime, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
            _player.UpdateCombat(gameTime, _enemyManager);
            _enemyManager.Update(gameTime, _player.Center, _player.Bounds);
+           
+           // --- HARİTA GEÇİŞ KONTROLÜ ---
+           // Yukarıdan çıkış -> Sonraki Map
+           if (_player.Position.Y < -20)
+           {
+               if (_currentMapIndex < MAX_MAPS)
+               {
+                   LoadMap(_currentMapIndex + 1);
+                   _player.SetPosition(new Vector2(_player.Position.X, GraphicsDevice.Viewport.Height - 80));
+               }
+               else
+               {
+                   // Son maptesin, gidemezsin
+                   _player.SetPosition(new Vector2(_player.Position.X, 0));
+               }
+           }
+           // Aşağıdan çıkış -> Önceki Map
+           else if (_player.Position.Y > GraphicsDevice.Viewport.Height)
+           {
+               if (_currentMapIndex > 1)
+               {
+                   LoadMap(_currentMapIndex - 1);
+                   _player.SetPosition(new Vector2(_player.Position.X, 10));
+               }
+               else
+               {
+                   // İlk maptesin, gidemezsin
+                   _player.SetPosition(new Vector2(_player.Position.X, GraphicsDevice.Viewport.Height - 64));
+               }
+           }
         }
         
         // Hasar sayıları
@@ -483,6 +679,17 @@ public class Game1 : Game
             // Düşmanları çiz
             _enemyManager.Draw(_spriteBatch);
         
+        // Satıcı NPC'yi çiz (Sadece Map 1)
+        if (_currentMapIndex == 1)
+        {
+            _spriteBatch.Draw(_vendorTexture, _vendorPosition, Color.White);
+            
+            // "SATICI" isim etiketi
+            string vendorName = "SATICI";
+            Vector2 namePos = new Vector2(_vendorPosition.X + 24 - _gameFont.MeasureString(vendorName).X * 0.3f, _vendorPosition.Y - 15);
+            _spriteBatch.DrawString(_gameFont, vendorName, namePos, Color.Yellow, 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
+        }
+        
         // Oyuncuyu çiz
         _player.Draw(_spriteBatch);
         
@@ -520,6 +727,21 @@ public class Game1 : Game
             // Enhancement UI (En üstte)
             _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
             _enhancementUI.Draw(_spriteBatch, _gameFont);
+            _shopUI.Draw(_spriteBatch, _gameFont);
+            
+            // Satıcı etkileşim ipucu
+            if (_nearVendor && !_shopUI.IsOpen && !_inventory.IsOpen)
+            {
+                string interactText = "[F] Saticiyla Konus";
+                Vector2 textSize = _gameFont.MeasureString(interactText);
+                Vector2 textPos = new Vector2(
+                    (GraphicsDevice.Viewport.Width - textSize.X) / 2,
+                    GraphicsDevice.Viewport.Height - 80
+                );
+                _spriteBatch.DrawString(_gameFont, interactText, textPos + new Vector2(2, 2), new Color(0, 0, 0, 200));
+                _spriteBatch.DrawString(_gameFont, interactText, textPos, Color.Yellow);
+            }
+            
             _spriteBatch.End();
         }
 
@@ -575,10 +797,122 @@ public class Game1 : Game
         
         // --- ALTIN ---
         // Sol üst köşe, can barının üstü veya yanı
+        // Sol üst köşe, can barının üstü veya yanı
         string goldText = $"{_player.Gold} G";
         _spriteBatch.DrawString(_gameFont, goldText, new Vector2(barX, barY + xpBarHeight + 35), Color.Gold);
+        
+        // Map Bilgisi (Sağ Üst)
+        string mapText = $"Bolge: {_currentMapIndex}";
+        if (_currentMapIndex == 1) mapText += " (Guvenli)";
+        else if (_currentMapIndex == 2) mapText += " (Goblin)";
+        else if (_currentMapIndex == 3) mapText += " (Orumcek)";
+        else if (_currentMapIndex == 4) mapText += " (Seytan)";
+        
+        Vector2 mapSize = _gameFont.MeasureString(mapText);
+        _spriteBatch.DrawString(_gameFont, mapText, 
+            new Vector2(_graphics.PreferredBackBufferWidth - mapSize.X - 20, 20), 
+            Color.LightGray);
     }
     
+    private void HandlePlayerDeath()
+    {
+        // 1. Para Cezası
+        _player.LoseGold(_pendingDeathPenalty);
+        
+        // 2. Canı Fullle
+        _player.CurrentHealth = _player.MaxHealth;
+        
+        // 3. Merkeze (Map 1) Işınla
+        LoadMap(1);
+        _player.SetPosition(new Vector2(_graphics.PreferredBackBufferWidth / 2f - 24, _graphics.PreferredBackBufferHeight / 2f - 32));
+        
+        // 4. Bilgi Mesajı (Yeni map yüklendikten sonra ekle ki silinmesin)
+        _damageNumbers.Add(new DamageNumber(
+            _player.Center + new Vector2(0, -60),
+            _pendingDeathPenalty,
+            Color.Red
+        ) { CustomText = $"OLDUN! -{_pendingDeathPenalty} Gold" });
+    }
+    
+    private Texture2D CreateVendorTexture(GraphicsDevice gd)
+    {
+        int width = 48;
+        int height = 64;
+        Texture2D texture = new Texture2D(gd, width, height);
+        Color[] data = new Color[width * height];
+        
+        // Renkler
+        Color robeColor = new Color(80, 40, 120); // Mor cüppe
+        Color skinColor = new Color(220, 180, 140);
+        Color goldAccent = new Color(255, 200, 50);
+        Color darkRobe = new Color(50, 25, 80);
+        
+        int centerX = width / 2;
+        
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int i = y * width + x;
+                data[i] = Color.Transparent;
+                
+                // Kafa (Daire)
+                if (y >= 5 && y < 20)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(centerX, 12));
+                    if (dist < 8)
+                    {
+                        data[i] = skinColor;
+                        // Gözler
+                        if (y == 11 && (x == centerX - 3 || x == centerX + 3))
+                            data[i] = Color.Black;
+                        // Ağız
+                        if (y == 15 && Math.Abs(x - centerX) < 2)
+                            data[i] = new Color(150, 100, 100);
+                    }
+                }
+                
+                // Kapşon (Baş etrafında)
+                if (y >= 2 && y < 18)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(centerX, 10));
+                    if (dist >= 9 && dist < 13)
+                    {
+                        data[i] = darkRobe;
+                    }
+                }
+                
+                // Cüppe (Gövde)
+                if (y >= 18 && y < height - 4)
+                {
+                    int robeWidth = 12 + (y - 18) / 3;
+                    if (Math.Abs(x - centerX) < robeWidth)
+                    {
+                        data[i] = robeColor;
+                        // Altın şerit
+                        if (Math.Abs(x - centerX) < 2)
+                            data[i] = goldAccent;
+                        // Kenar
+                        if (Math.Abs(x - centerX) >= robeWidth - 2)
+                            data[i] = darkRobe;
+                    }
+                }
+                
+                // Eller (Yanlarda)
+                if (y >= 30 && y < 40)
+                {
+                    if ((x >= 5 && x < 12) || (x >= width - 12 && x < width - 5))
+                    {
+                        data[i] = skinColor;
+                    }
+                }
+            }
+        }
+        
+        texture.SetData(data);
+        return texture;
+    }
+
     private Texture2D CreateDungeonFloor()
     {
         int size = 64; // Her bir kare taşın boyutu

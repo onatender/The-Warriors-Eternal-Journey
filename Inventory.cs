@@ -38,6 +38,8 @@ public class Inventory
     // Equipment slotları
     public InventorySlot WeaponSlot { get; private set; } = new InventorySlot();
     public InventorySlot ArmorSlot { get; private set; } = new InventorySlot();
+    public InventorySlot ShieldSlot { get; private set; } = new InventorySlot();
+    public InventorySlot HelmetSlot { get; private set; } = new InventorySlot();
     
     // Görsel
     private Texture2D _slotTexture;
@@ -47,6 +49,8 @@ public class Inventory
     private Texture2D _pageButtonTexture;
     private Texture2D _weaponSlotIcon;
     private Texture2D _armorSlotIcon;
+    private Texture2D _shieldSlotIcon;
+    private Texture2D _helmetSlotIcon;
     
     // Pozisyon
     private Vector2 _position;
@@ -54,7 +58,7 @@ public class Inventory
     
     // Mouse hover ve seçim
     private Point _hoveredSlot = new Point(-1, -1);
-    private int _hoveredEquipSlot = -1; // 0 = weapon, 1 = armor, -1 = none
+    private int _hoveredEquipSlot = -1; // 0 = weapon, 1 = armor, 2 = shield, 3 = helmet, -1 = none
     private MouseState _previousMouseState;
     private KeyboardState _previousKeyState;
     
@@ -77,6 +81,8 @@ public class Inventory
     // Equipment slot pozisyonları
     private Rectangle _weaponSlotRect;
     private Rectangle _armorSlotRect;
+    private Rectangle _shieldSlotRect;
+    private Rectangle _helmetSlotRect;
     
     // Tooltip
     private Item _tooltipItem = null;
@@ -85,9 +91,19 @@ public class Inventory
     // Event - equipment değiştiğinde
     public event Action<Item> OnWeaponEquipped;
     public event Action<Item> OnArmorEquipped;
+    public event Action<Item> OnShieldEquipped;
+    public event Action<Item> OnHelmetEquipped;
     public event Action<Item> OnEnhancementTargetSelected;
     
     public bool IsEnhancementMode { get; set; } = false;
+    
+    // ShopUI için slot erişimi
+    public InventorySlot GetSlot(int page, int y, int x)
+    {
+        if (page >= 0 && page < PAGE_COUNT && y >= 0 && y < GRID_SIZE && x >= 0 && x < GRID_SIZE)
+            return _slots[page, y, x];
+        return null;
+    }
     
     public Inventory(GraphicsDevice graphicsDevice, int screenWidth, int screenHeight)
     {
@@ -245,6 +261,12 @@ public class Inventory
         
         // Armor slot icon (zırh silüeti)
         _armorSlotIcon = CreateArmorSlotIcon(graphicsDevice);
+        
+        // Shield slot icon (kalkan silüeti)
+        _shieldSlotIcon = CreateShieldSlotIcon(graphicsDevice);
+        
+        // Helmet slot icon (kask silüeti)
+        _helmetSlotIcon = CreateHelmetSlotIcon(graphicsDevice);
     }
     
     private Texture2D CreateWeaponSlotIcon(GraphicsDevice graphicsDevice)
@@ -321,6 +343,74 @@ public class Inventory
         return texture;
     }
     
+    private Texture2D CreateShieldSlotIcon(GraphicsDevice graphicsDevice)
+    {
+        int size = 50;
+        Texture2D texture = new Texture2D(graphicsDevice, size, size);
+        Color[] colors = new Color[size * size];
+        Color iconColor = new Color(60, 60, 80);
+        
+        int centerX = size / 2;
+        
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                int i = y * size + x;
+                colors[i] = Color.Transparent;
+                
+                // Kalkan silüeti (Üstte geniş, altta sivri)
+                int maxWidth = 16;
+                int width = maxWidth - (y * y) / 100;
+                
+                if (y >= 6 && y < size - 6 && width > 0 && Math.Abs(x - centerX) < width)
+                {
+                    colors[i] = iconColor;
+                }
+            }
+        }
+        
+        texture.SetData(colors);
+        return texture;
+    }
+    
+    private Texture2D CreateHelmetSlotIcon(GraphicsDevice graphicsDevice)
+    {
+        int size = 50;
+        Texture2D texture = new Texture2D(graphicsDevice, size, size);
+        Color[] colors = new Color[size * size];
+        Color iconColor = new Color(60, 60, 80);
+        
+        int centerX = size / 2;
+        int headCenterY = 22;
+        
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                int i = y * size + x;
+                colors[i] = Color.Transparent;
+                
+                // Kask silüeti (Yarım küre)
+                float dist = Vector2.Distance(new Vector2(x, y), new Vector2(centerX, headCenterY));
+                
+                if (y >= 8 && y < 38 && dist < 16)
+                {
+                    colors[i] = iconColor;
+                    
+                    // Yüz açıklığı
+                    if (y > 18 && y < 32 && Math.Abs(x - centerX) < 5)
+                    {
+                        colors[i] = Color.Transparent;
+                    }
+                }
+            }
+        }
+        
+        texture.SetData(colors);
+        return texture;
+    }
+    
     private void CalculatePosition()
     {
         int gridWidth = GRID_SIZE * (SLOT_SIZE + SLOT_PADDING) - SLOT_PADDING;
@@ -351,7 +441,9 @@ public class Inventory
         int equipY = (int)_position.Y + 60;
         
         _weaponSlotRect = new Rectangle(equipX, equipY, 60, 60);
-        _armorSlotRect = new Rectangle(equipX, equipY + 80, 60, 60);
+        _armorSlotRect = new Rectangle(equipX, equipY + 70, 60, 60);
+        _shieldSlotRect = new Rectangle(equipX, equipY + 140, 60, 60);
+        _helmetSlotRect = new Rectangle(equipX, equipY + 210, 60, 60);
     }
     
     public void UpdateScreenSize(int screenWidth, int screenHeight)
@@ -428,6 +520,24 @@ public class Inventory
                     _tooltipPosition = new Vector2(mousePos.X + 15, mousePos.Y + 15);
                 }
             }
+            else if (_shieldSlotRect.Contains(mousePos))
+            {
+                _hoveredEquipSlot = 2;
+                if (!ShieldSlot.IsEmpty)
+                {
+                    _tooltipItem = ShieldSlot.Item;
+                    _tooltipPosition = new Vector2(mousePos.X + 15, mousePos.Y + 15);
+                }
+            }
+            else if (_helmetSlotRect.Contains(mousePos))
+            {
+                _hoveredEquipSlot = 3;
+                if (!HelmetSlot.IsEmpty)
+                {
+                    _tooltipItem = HelmetSlot.Item;
+                    _tooltipPosition = new Vector2(mousePos.X + 15, mousePos.Y + 15);
+                }
+            }
             
             // Sayfa butonları hover
             _hoveringPrev = _prevPageButton.Contains(mousePos);
@@ -490,12 +600,19 @@ public class Inventory
             // Ekipman slotu mu?
             else if (_hoveredEquipSlot >= 0)
             {
-                var slot = _hoveredEquipSlot == 0 ? WeaponSlot : ArmorSlot;
-                if (!slot.IsEmpty) targetItem = slot.Item;
+                InventorySlot slot = _hoveredEquipSlot switch
+                {
+                    0 => WeaponSlot,
+                    1 => ArmorSlot,
+                    2 => ShieldSlot,
+                    3 => HelmetSlot,
+                    _ => null
+                };
+                if (slot != null && !slot.IsEmpty) targetItem = slot.Item;
             }
             
             // Eğer geçerli bir hedefse tetikle
-            if (targetItem != null && (targetItem.Type == ItemType.Weapon || targetItem.Type == ItemType.Armor))
+            if (targetItem != null && (targetItem.Type == ItemType.Weapon || targetItem.Type == ItemType.Armor || targetItem.Type == ItemType.Shield || targetItem.Type == ItemType.Helmet))
             {
                 OnEnhancementTargetSelected?.Invoke(targetItem);
                 IsEnhancementMode = false; // Modu kapat
@@ -618,13 +735,33 @@ public class Inventory
                     SwapOrMove(slot, ArmorSlot);
                     OnArmorEquipped?.Invoke(ArmorSlot.Item);
                 }
+                else if (slot.Item.Type == ItemType.Shield)
+                {
+                    // Kalkanı giy
+                    SwapOrMove(slot, ShieldSlot);
+                    OnShieldEquipped?.Invoke(ShieldSlot.Item);
+                }
+                else if (slot.Item.Type == ItemType.Helmet)
+                {
+                    // Kaskı giy
+                    SwapOrMove(slot, HelmetSlot);
+                    OnHelmetEquipped?.Invoke(HelmetSlot.Item);
+                }
             }
         }
         // Equipment slot - sağ tık ile eşya çıkar
         else if (_hoveredEquipSlot >= 0)
         {
-            var equipSlot = _hoveredEquipSlot == 0 ? WeaponSlot : ArmorSlot;
-            if (!equipSlot.IsEmpty)
+            InventorySlot equipSlot = _hoveredEquipSlot switch
+            {
+                0 => WeaponSlot,
+                1 => ArmorSlot,
+                2 => ShieldSlot,
+                3 => HelmetSlot,
+                _ => null
+            };
+            
+            if (equipSlot != null && !equipSlot.IsEmpty)
             {
                 // Boş slot bul ve oraya taşı
                 for (int p = 0; p < PAGE_COUNT; p++)
@@ -639,10 +776,14 @@ public class Inventory
                                 _slots[p, y, x].Quantity = 1;
                                 equipSlot.Clear();
                                 
-                                if (_hoveredEquipSlot == 0)
-                                    OnWeaponEquipped?.Invoke(null);
-                                else
-                                    OnArmorEquipped?.Invoke(null);
+                                // Event tetikle
+                                switch (_hoveredEquipSlot)
+                                {
+                                    case 0: OnWeaponEquipped?.Invoke(null); break;
+                                    case 1: OnArmorEquipped?.Invoke(null); break;
+                                    case 2: OnShieldEquipped?.Invoke(null); break;
+                                    case 3: OnHelmetEquipped?.Invoke(null); break;
+                                }
                                 return;
                             }
                         }
@@ -749,11 +890,23 @@ public class Inventory
         DrawEquipmentSlot(spriteBatch, _armorSlotRect, ArmorSlot, _armorSlotIcon,
             _hoveredEquipSlot == 1, _selectedSlot == ArmorSlot);
         
+        // Shield slot
+        DrawEquipmentSlot(spriteBatch, _shieldSlotRect, ShieldSlot, _shieldSlotIcon,
+            _hoveredEquipSlot == 2, _selectedSlot == ShieldSlot);
+        
+        // Helmet slot
+        DrawEquipmentSlot(spriteBatch, _helmetSlotRect, HelmetSlot, _helmetSlotIcon,
+            _hoveredEquipSlot == 3, _selectedSlot == HelmetSlot);
+        
         // Slot etiketleri
         spriteBatch.DrawString(font, "Silah", new Vector2(_weaponSlotRect.X, _weaponSlotRect.Bottom + 2), 
-            new Color(150, 150, 150), 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
+            new Color(150, 150, 150), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
         spriteBatch.DrawString(font, "Zirh", new Vector2(_armorSlotRect.X, _armorSlotRect.Bottom + 2), 
-            new Color(150, 150, 150), 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
+            new Color(150, 150, 150), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
+        spriteBatch.DrawString(font, "Kalkan", new Vector2(_shieldSlotRect.X, _shieldSlotRect.Bottom + 2), 
+            new Color(150, 150, 150), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
+        spriteBatch.DrawString(font, "Kask", new Vector2(_helmetSlotRect.X, _helmetSlotRect.Bottom + 2), 
+            new Color(150, 150, 150), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
         
         // Sayfa göstergesi
         string pageText = $"Sayfa {_currentPage + 1}/{PAGE_COUNT}";
@@ -819,8 +972,16 @@ public class Inventory
     {
         // Tooltip içeriği
         string name = item.GetDisplayName();
-        string type = item.Type == ItemType.Weapon ? "Silah" : "Zirh";
-        string level = $"Gerekli Seviye: {item.RequiredLevel}";
+        string type = item.Type switch
+        {
+            ItemType.Weapon => "Silah",
+            ItemType.Armor => "Zirh",
+            ItemType.Shield => "Kalkan",
+            ItemType.Helmet => "Kask",
+            ItemType.Material => "Malzeme",
+            _ => "Esya"
+        };
+        string level = item.RequiredLevel > 0 ? $"Gerekli Seviye: {item.RequiredLevel}" : "";
         
         string stats = "";
         if (item.Type == ItemType.Weapon)
@@ -829,18 +990,30 @@ public class Inventory
         }
         else if (item.Type == ItemType.Armor)
         {
-            stats = $"Savunma: {item.Defense}\nCan: +{item.Health}";
+            stats = $"Savunma: +{item.Defense}\nCan: +{item.Health}";
         }
+        else if (item.Type == ItemType.Shield)
+        {
+            stats = $"Savunma: +{item.Defense}\nBloklama: %{item.BlockChance}";
+        }
+        else if (item.Type == ItemType.Helmet)
+        {
+            stats = $"Savunma: +{item.Defense}\nCan: +{item.Health}";
+        }
+        
+        // Fiyat bilgisi
+        string priceInfo = $"Satis: {item.SellPrice}G | Alis: {item.BuyPrice}G";
         
         // Boyut hesapla
         float scale = 0.8f;
         Vector2 nameSize = font.MeasureString(name) * scale;
         Vector2 typeSize = font.MeasureString(type) * scale;
-        Vector2 levelSize = font.MeasureString(level) * scale;
-        Vector2 statsSize = font.MeasureString(stats) * scale;
+        Vector2 levelSize = level.Length > 0 ? font.MeasureString(level) * scale : Vector2.Zero;
+        Vector2 statsSize = stats.Length > 0 ? font.MeasureString(stats) * scale : Vector2.Zero;
+        Vector2 priceSize = font.MeasureString(priceInfo) * scale;
         
-        float maxWidth = Math.Max(Math.Max(nameSize.X, typeSize.X), Math.Max(levelSize.X, statsSize.X));
-        float totalHeight = nameSize.Y + typeSize.Y + levelSize.Y + statsSize.Y + 25;
+        float maxWidth = Math.Max(Math.Max(nameSize.X, typeSize.X), Math.Max(Math.Max(levelSize.X, statsSize.X), priceSize.X));
+        float totalHeight = nameSize.Y + typeSize.Y + (level.Length > 0 ? levelSize.Y + 5 : 0) + (stats.Length > 0 ? statsSize.Y + 5 : 0) + priceSize.Y + 20;
         
         // Ekran sınırlarını kontrol et
         if (position.X + maxWidth + 20 > _screenWidth)
@@ -875,13 +1048,24 @@ public class Inventory
             0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
         yOffset += typeSize.Y + 5;
         
-        // Seviye
-        spriteBatch.DrawString(font, level, position + new Vector2(0, yOffset), new Color(255, 200, 100),
-            0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-        yOffset += levelSize.Y + 5;
+        // Seviye (varsa)
+        if (level.Length > 0)
+        {
+            spriteBatch.DrawString(font, level, position + new Vector2(0, yOffset), new Color(255, 200, 100),
+                0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            yOffset += levelSize.Y + 5;
+        }
         
-        // İstatistikler
-        spriteBatch.DrawString(font, stats, position + new Vector2(0, yOffset), new Color(100, 200, 100),
+        // İstatistikler (varsa)
+        if (stats.Length > 0)
+        {
+            spriteBatch.DrawString(font, stats, position + new Vector2(0, yOffset), new Color(100, 200, 100),
+                0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            yOffset += statsSize.Y + 5;
+        }
+        
+        // Fiyat bilgisi
+        spriteBatch.DrawString(font, priceInfo, position + new Vector2(0, yOffset), Color.Gold,
             0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
     }
     

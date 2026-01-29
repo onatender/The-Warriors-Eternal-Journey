@@ -23,6 +23,8 @@ public class SaveData
     // Nesne tabanlı ekipman kaydı
     public SavedItem EquippedWeapon { get; set; }
     public SavedItem EquippedArmor { get; set; }
+    public SavedItem EquippedShield { get; set; }
+    public SavedItem EquippedHelmet { get; set; }
 }
 
 public class SavedItem

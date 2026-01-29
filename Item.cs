@@ -9,7 +9,9 @@ public enum ItemType
     None,
     Weapon,
     Armor,
-    Material
+    Material,
+    Shield,  // Kalkan
+    Helmet   // Kask
 }
 
 public enum ItemRarity
@@ -39,6 +41,13 @@ public class Item
     // Zırh özellikleri
     public int Defense { get; set; }
     public int Health { get; set; }
+    
+    // Kalkan özellikleri
+    public int BlockChance { get; set; } // 0-100 arası yüzde
+    
+    // Satış Fiyatı
+    public int BuyPrice { get; set; } = 10; // Varsayılan 10 altın
+    public int SellPrice => BuyPrice / 2; // Satış fiyatı = Alış / 2
     
     // Görsel
     public Texture2D Icon { get; set; }
@@ -87,7 +96,8 @@ public class Item
             Defense = this.Defense,
             Health = this.Health,
             Icon = this.Icon,
-            IconColor = this.IconColor
+            IconColor = this.IconColor,
+            BlockChance = this.BlockChance
         };
     }
 
@@ -102,10 +112,15 @@ public class Item
             MaxDamage = (int)(MaxDamage * 1.2f) + 1;
         }
         // Zırh ise defans/can artır
-        else if (Type == ItemType.Armor)
+        else if (Type == ItemType.Armor || Type == ItemType.Helmet)
         {
             Defense = (int)(Defense * 1.2f) + 1;
             Health = (int)(Health * 1.2f) + 5;
+        }
+        else if (Type == ItemType.Shield)
+        {
+            Defense = (int)(Defense * 1.2f) + 1;
+            BlockChance = Math.Min(BlockChance + 2, 75); // Max %75
         }
     }
 
@@ -121,10 +136,15 @@ public class Item
             MaxDamage = (int)((MaxDamage - 1) / 1.2f);
         }
         // Zırh 
-        else if (Type == ItemType.Armor)
+        else if (Type == ItemType.Armor || Type == ItemType.Helmet)
         {
             Defense = (int)((Defense - 1) / 1.2f);
             Health = (int)((Health - 5) / 1.2f);
+        }
+        else if (Type == ItemType.Shield)
+        {
+            Defense = (int)((Defense - 1) / 1.2f);
+            BlockChance = Math.Max(BlockChance - 2, 0);
         }
     }
 }
@@ -154,6 +174,7 @@ public static class ItemDatabase
             MinDamage = 5,
             MaxDamage = 10,
             AttackSpeed = 50,
+            BuyPrice = 50,
             Icon = CreateWeaponIcon(graphicsDevice, new Color(139, 90, 43)) // Kahverengi tahta
         };
         
@@ -169,6 +190,7 @@ public static class ItemDatabase
             EnhancementLevel = 0,
             Defense = 5,
             Health = 10,
+            BuyPrice = 40,
             Icon = CreateArmorIcon(graphicsDevice, new Color(150, 120, 90))
         };
         
@@ -285,6 +307,70 @@ public static class ItemDatabase
             Type = ItemType.Material,
             Rarity = ItemRarity.Legendary,
             Icon = CreateAmuletIcon(graphicsDevice, Color.Gold, Color.Purple) // Altın çerçeve, mor taş
+        };
+
+        // === KALKANLAR ===
+        
+        // ID 40: Tahta Kalkan
+        _items[40] = new Item
+        {
+            Id = 40,
+            Name = "Tahta Kalkan",
+            Description = "Basit tahta kalkan. Bloklama sansi verir.",
+            Type = ItemType.Shield,
+            Rarity = ItemRarity.Common,
+            RequiredLevel = 1,
+            Defense = 5,
+            BlockChance = 10,
+            BuyPrice = 60,
+            Icon = CreateShieldIcon(graphicsDevice, new Color(139, 90, 43)) // Kahverengi tahta
+        };
+        
+        // ID 41: Demir Kalkan
+        _items[41] = new Item
+        {
+            Id = 41,
+            Name = "Demir Kalkan",
+            Description = "Saglam demir kalkan. Yuksek bloklama sansi.",
+            Type = ItemType.Shield,
+            Rarity = ItemRarity.Uncommon,
+            RequiredLevel = 1,
+            Defense = 12,
+            BlockChance = 18,
+            BuyPrice = 150,
+            Icon = CreateShieldIcon(graphicsDevice, new Color(180, 180, 190)) // Gümüş/Demir
+        };
+        
+        // === KASKLAR ===
+        
+        // ID 50: Deri Kask
+        _items[50] = new Item
+        {
+            Id = 50,
+            Name = "Deri Kask",
+            Description = "Hafif deri kask.",
+            Type = ItemType.Helmet,
+            Rarity = ItemRarity.Common,
+            RequiredLevel = 1,
+            Defense = 3,
+            Health = 5,
+            BuyPrice = 35,
+            Icon = CreateHelmetIcon(graphicsDevice, new Color(120, 80, 50)) // Kahverengi deri
+        };
+        
+        // ID 51: Demir Kask
+        _items[51] = new Item
+        {
+            Id = 51,
+            Name = "Demir Kask",
+            Description = "Saglam demir kask.",
+            Type = ItemType.Helmet,
+            Rarity = ItemRarity.Uncommon,
+            RequiredLevel = 1,
+            Defense = 8,
+            Health = 15,
+            BuyPrice = 100,
+            Icon = CreateHelmetIcon(graphicsDevice, new Color(180, 180, 190)) // Gümüş/Demir
         };
 
         _initialized = true;
@@ -547,6 +633,108 @@ public static class ItemDatabase
                             (int)(armorColor.B * gradient)
                         );
                     }
+                }
+            }
+        }
+        
+        texture.SetData(colors);
+        return texture;
+    }
+    
+    private static Texture2D CreateShieldIcon(GraphicsDevice graphicsDevice, Color shieldColor)
+    {
+        int size = 40;
+        Texture2D texture = new Texture2D(graphicsDevice, size, size);
+        Color[] colors = new Color[size * size];
+        
+        int centerX = size / 2;
+        
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                int i = y * size + x;
+                colors[i] = Color.Transparent;
+                
+                // Kalkan şekli (Üstte geniş, altta sivri)
+                int maxWidth = 16;
+                int width = maxWidth - (y * y) / 80; // Parabolik daralma
+                
+                if (y >= 4 && y < size - 4 && width > 0 && Math.Abs(x - centerX) < width)
+                {
+                    float gradient = 1f - (float)Math.Abs(x - centerX) / width * 0.3f;
+                    colors[i] = new Color(
+                        (int)(shieldColor.R * gradient),
+                        (int)(shieldColor.G * gradient),
+                        (int)(shieldColor.B * gradient)
+                    );
+                    
+                    // Orta şerit (dekorasyon)
+                    if (Math.Abs(x - centerX) < 2)
+                    {
+                        colors[i] = Color.Lerp(shieldColor, Color.White, 0.3f);
+                    }
+                    
+                    // Kenar çizgisi
+                    if (Math.Abs(x - centerX) >= width - 1)
+                    {
+                        colors[i] = Color.Lerp(shieldColor, Color.Black, 0.3f);
+                    }
+                }
+            }
+        }
+        
+        texture.SetData(colors);
+        return texture;
+    }
+    
+    private static Texture2D CreateHelmetIcon(GraphicsDevice graphicsDevice, Color helmetColor)
+    {
+        int size = 40;
+        Texture2D texture = new Texture2D(graphicsDevice, size, size);
+        Color[] colors = new Color[size * size];
+        
+        int centerX = size / 2;
+        
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                int i = y * size + x;
+                colors[i] = Color.Transparent;
+                
+                // Kask şekli (Yarım küre)
+                if (y >= 8 && y < 30)
+                {
+                    int radius = 14;
+                    int headCenterY = 18;
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(centerX, headCenterY));
+                    
+                    if (dist < radius)
+                    {
+                        float gradient = 1f - dist / radius * 0.3f;
+                        colors[i] = new Color(
+                            (int)(helmetColor.R * gradient),
+                            (int)(helmetColor.G * gradient),
+                            (int)(helmetColor.B * gradient)
+                        );
+                        
+                        // Yüz açıklığı (T şekli)
+                        if (y > 15 && y < 26 && Math.Abs(x - centerX) < 4)
+                        {
+                            colors[i] = Color.Transparent;
+                        }
+                        if (y >= 14 && y < 17 && Math.Abs(x - centerX) < 8)
+                        {
+                            colors[i] = Color.Transparent;
+                        }
+                    }
+                }
+                
+                // Tepe süsü
+                if (y >= 4 && y < 10 && Math.Abs(x - centerX) < 3)
+                {
+                    colors[i] = Color.Lerp(helmetColor, Color.Gold, 0.3f);
                 }
             }
         }

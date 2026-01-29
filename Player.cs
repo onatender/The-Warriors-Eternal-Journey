@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Audio;
 
 namespace EternalJourney;
 
@@ -42,6 +43,29 @@ public class Player
     public float GetAttackRadius() => _attackRadius;
     public Enemy GetCurrentTarget() => _currentTarget;
     
+    // SFX
+    private SoundEffect _sfxSlice1;
+    private SoundEffect _sfxSlice2;
+    private SoundEffect _sfxWalk;
+    private SoundEffectInstance _walkSoundInstance;
+
+    public void SetCombatSounds(SoundEffect s1, SoundEffect s2)
+    {
+        _sfxSlice1 = s1;
+        _sfxSlice2 = s2;
+    }
+    
+    public void SetWalkSound(SoundEffect walkSound)
+    {
+        _sfxWalk = walkSound;
+        if (_sfxWalk != null)
+        {
+            _walkSoundInstance = _sfxWalk.CreateInstance();
+            _walkSoundInstance.IsLooped = true;
+            _walkSoundInstance.Volume = 0.3f; // Düşük ses seviyesi
+        }
+    }
+    
     // --- PARÇACIK SİSTEMİ ---
     private struct PlayerParticle
     {
@@ -65,8 +89,7 @@ public class Player
         while (Experience >= MaxExperience && Level < MAX_LEVEL)
         {
             Experience -= MaxExperience;
-            Level++;
-            MaxExperience = (long)(100 * Math.Pow(Level, 1.2));
+            Level++; // MaxExperience setter içinde güncellenir
             MaxHealth += 10; 
             CurrentHealth = MaxHealth; 
             OnLevelUp?.Invoke();
@@ -84,11 +107,24 @@ public class Player
     private float _regenTimer = 0f;
     
     public Vector2 Position => _position;
+    public void SetPosition(Vector2 newPos) { _position = newPos; }
+    
     public Vector2 Center => new Vector2(_position.X + _width / 2, _position.Y + _height / 2);
     public Rectangle Bounds => new Rectangle((int)_position.X, (int)_position.Y, _width, _height);
     
     // İstatistikler
-    public int Level { get; set; } = 1;
+    private int _level = 1;
+    public int Level 
+    { 
+        get => _level; 
+        set 
+        {
+            _level = value;
+            // Level değişince MaxXP'yi güncelle
+            MaxExperience = (long)(100 * Math.Pow(_level, 1.2));
+        }
+    }
+    
     public int CurrentHealth { get; set; } = 100;
     public int MaxHealth { get; set; } = 100;
     
@@ -103,6 +139,49 @@ public class Player
     public void GainGold(int amount)
     {
         Gold += amount;
+    }
+    
+    public void LoseGold(int amount)
+    {
+        Gold -= amount;
+        if (Gold < 0) Gold = 0;
+    }
+    
+    // Ekipman - Kalkan ve Kask
+    private Item _equippedShield = null;
+    private Item _equippedHelmet = null;
+    
+    public void EquipShield(Item shield)
+    {
+        _equippedShield = shield;
+    }
+    
+    public void EquipHelmet(Item helmet)
+    {
+        _equippedHelmet = helmet;
+    }
+    
+    public Item GetEquippedShield() => _equippedShield;
+    public Item GetEquippedHelmet() => _equippedHelmet;
+    
+    // Bloklama Kontrolü - Dışarıdan çağrılacak
+    public bool TryBlock()
+    {
+        if (_equippedShield == null) return false;
+        
+        // Bloklama şansı = Kalkanın BlockChance + (Seviye * 2)
+        int blockChance = _equippedShield.BlockChance + (_equippedShield.EnhancementLevel * 2);
+        return _random.Next(100) < blockChance;
+    }
+    
+    // Toplam Savunma Hesapla (Zırh + Kalkan + Kask)
+    public int GetTotalDefense()
+    {
+        int defense = 0;
+        if (_equippedArmor != null) defense += _equippedArmor.Defense;
+        if (_equippedShield != null) defense += _equippedShield.Defense;
+        if (_equippedHelmet != null) defense += _equippedHelmet.Defense;
+        return defense;
     }
     
     // Saldırı event
@@ -350,6 +429,10 @@ public class Player
         _isAttacking = true;
         _attackTimer = 0f;
         
+        // Play Attack Sound
+        if (_random.Next(2) == 0) _sfxSlice1?.Play(0.4f, 0f, 0f);
+        else _sfxSlice2?.Play(0.4f, 0f, 0f);
+        
         float attackSpeed = _equippedWeapon.AttackSpeed / 50f;
         _attackCooldown = 1f / (_baseAttackSpeed * attackSpeed);
         
@@ -411,11 +494,26 @@ public class Player
         if (keyState.IsKeyDown(Keys.D) || keyState.IsKeyDown(Keys.Right)) { _velocity.X += 1; _facingDirection = 1; }
         
         _isMoving = _velocity != Vector2.Zero;
+        
+        // Yürüyüş Sesi Kontrolü
+        if (_walkSoundInstance != null)
+        {
+            if (_isMoving && _walkSoundInstance.State != SoundState.Playing)
+            {
+                _walkSoundInstance.Play();
+            }
+            else if (!_isMoving && _walkSoundInstance.State == SoundState.Playing)
+            {
+                _walkSoundInstance.Stop();
+            }
+        }
+        
         if (_velocity != Vector2.Zero) _velocity.Normalize();
         
         _position += _velocity * _speed * deltaTime;
         _position.X = MathHelper.Clamp(_position.X, 0, screenWidth - _width);
-        _position.Y = MathHelper.Clamp(_position.Y, 0, screenHeight - _height);
+        // Y eksenini kısıtlamıyoruz ki harita değiştirebilelim
+        // _position.Y = MathHelper.Clamp(_position.Y, 0, screenHeight - _height);
         
         if (_isMoving) _animationTimer += deltaTime * 10f;
         if (_attackCooldown > 0) _attackCooldown -= deltaTime;

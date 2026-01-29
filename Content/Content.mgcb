@@ -20,3 +20,27 @@
 /processorParam:TextureFormat=Compressed
 /build:GameFont.spritefont
 
+
+#begin SFX/sword_slice_1.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/sword_slice_1.mp3
+
+#begin SFX/sword_slice_2.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/sword_slice_2.mp3
+
+#begin SFX/sword_clash.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/sword_clash.mp3
+
+#begin SFX/walk.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/walk.mp3
