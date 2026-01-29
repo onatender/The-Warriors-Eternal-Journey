@@ -1,0 +1,11 @@
+[Bb]in/
+[Oo]bj/
+.vscode/
+.vs/
+*.user
+*.suo
+*.userprefs
+*.DS_Store
+Thumbs.db
+Saves/
+*.log

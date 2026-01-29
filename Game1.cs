@@ -1,0 +1,673 @@
+﻿using System;
+using System.Collections.Generic;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
+
+namespace EternalJourney;
+
+public enum GameState
+{
+    Login,
+    Playing
+}
+
+public class Game1 : Game
+{
+    private GraphicsDeviceManager _graphics;
+    private SpriteBatch _spriteBatch;
+    private Player _player;
+    private Inventory _inventory;
+    private EnhancementUI _enhancementUI;
+    private EnemyManager _enemyManager;
+    private SpriteFont _gameFont;
+    private Texture2D _pixelTexture;
+    private Texture2D _backgroundTexture; // Yeni arka plan
+    
+    public static double TotalTime; // Statik zaman değişkeni
+    
+    // Hasar sayıları (floating damage numbers)
+    private List<DamageNumber> _damageNumbers = new List<DamageNumber>();
+    
+    // Cursor
+    private Texture2D _cursorTexture; // Varsayılan cursor
+    private Texture2D _magicCursorTexture; // Mod için
+    
+    // Tam ekran toggle için
+    private KeyboardState _previousKeyState;
+    
+    // Login ve Save
+    private GameState _currentState = GameState.Login;
+    private string _playerName = "";
+    private KeyboardState _currentKeyState;
+
+    public Game1()
+    {
+        _graphics = new GraphicsDeviceManager(this);
+        Content.RootDirectory = "Content";
+        IsMouseVisible = false;
+
+        // Tam ekran ayarları
+        _graphics.PreferredBackBufferWidth = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width;
+        _graphics.PreferredBackBufferHeight = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Height;
+        _graphics.IsFullScreen = true;
+        _graphics.HardwareModeSwitch = false;
+    }
+
+    protected override void Initialize()
+    {
+        base.Initialize();
+        
+        // Karakter girişi için klavye olayını dinle
+        Window.TextInput += OnTextInput;
+        
+        // Çıkış yaparken kaydet
+        Exiting += OnGameExiting;
+    }
+    
+    private void OnTextInput(object sender, TextInputEventArgs e)
+    {
+        if (_currentState != GameState.Login) return;
+        
+        if (e.Key == Keys.Back && _playerName.Length > 0)
+        {
+            _playerName = _playerName.Substring(0, _playerName.Length - 1);
+        }
+        else if (e.Key == Keys.Enter)
+        {
+            // Giriş yap
+            if (!string.IsNullOrWhiteSpace(_playerName))
+            {
+                StartGame();
+            }
+        }
+        else
+        {
+            // Sadece harf ve rakamlar
+            char c = e.Character;
+            if (char.IsLetterOrDigit(c) || c == ' ')
+            {
+                if (_playerName.Length < 15) // Maksimum uzunluk
+                    _playerName += c;
+            }
+        }
+    }
+    
+    private void StartGame()
+    {
+        // Kayıt kontrolü
+        SaveData data = SaveManager.LoadGame(_playerName);
+        if (data != null)
+        {
+             // Kayıt bulundu, yükle
+            _player.CurrentHealth = data.CurrentHealth;
+            _player.MaxHealth = data.MaxHealth;
+            _player.Level = data.Level;
+            _player.GainExperience((int)data.Experience);
+            _player.GainGold(data.Gold); // Altın yükle
+             
+             // Inventory yükle
+             _inventory.LoadItems(data.InventoryItems);
+             
+             // Eşyaları kuşan (ID varsa)
+             // Eşyaları kuşan 
+             if (data.EquippedWeapon != null && data.EquippedWeapon.ItemId > 0) 
+             {
+                 Item weapon = ItemDatabase.GetItem(data.EquippedWeapon.ItemId);
+                 if (weapon != null)
+                 {
+                     // Seviye uygula
+                     for(int i=0; i<data.EquippedWeapon.EnhancementLevel; i++) weapon.UpgradeSuccess();
+                     
+                     _player.EquipWeapon(weapon);
+                     _inventory.WeaponSlot.Item = weapon;
+                     _inventory.WeaponSlot.Quantity = 1;
+                 }
+             }
+             
+             if (data.EquippedArmor != null && data.EquippedArmor.ItemId > 0) 
+             {
+                 Item armor = ItemDatabase.GetItem(data.EquippedArmor.ItemId);
+                 if (armor != null)
+                 {
+                     // Seviye uygula
+                     for(int i=0; i<data.EquippedArmor.EnhancementLevel; i++) armor.UpgradeSuccess();
+                     
+                     _player.EquipArmor(armor);
+                     _inventory.ArmorSlot.Item = armor;
+                     _inventory.ArmorSlot.Quantity = 1;
+                 }
+             }
+             
+             // Pozisyon - Player constructorında window center kullanılıyor. Kayıtlı pozisyonu yüklemek için:
+             // Şimdilik pas geçiyoruz (kullanıcının orijinal kodunda kapalıydı)
+        }
+        else
+        {
+            // Yeni oyun
+            // Başlangıç itemlarını envantere ekle
+            _inventory.AddItem(1); // Tahta Kılıç
+            _inventory.AddItem(3); // Deri Zırh
+            
+            // Eğer başlangıçta giyinik olmasını istersek:
+            /*
+            Item startWeapon = ItemDatabase.GetItem(1);
+            _player.EquipWeapon(startWeapon);
+            _inventory.WeaponSlot.Item = startWeapon;
+            _inventory.WeaponSlot.Quantity = 1;
+            */
+            // Ama şimdilik envantere ekliyoruz, oyuncu kendi giyecek.
+        }
+        
+        _currentState = GameState.Playing;
+        Window.TextInput -= OnTextInput; // Olayı kaldır
+    }
+    
+    private void OnGameExiting(object sender, EventArgs args)
+    {
+        if (_currentState == GameState.Playing && _player != null)
+        {
+            // Ekipmanları hazırla
+            SavedItem savedWeapon = null;
+            var w = _player.GetEquippedWeapon();
+            if (w != null)
+                savedWeapon = new SavedItem { ItemId = w.Id, Quantity = 1, EnhancementLevel = w.EnhancementLevel };
+                
+            SavedItem savedArmor = null;
+            var a = _player.GetEquippedArmor();
+            if (a != null)
+                savedArmor = new SavedItem { ItemId = a.Id, Quantity = 1, EnhancementLevel = a.EnhancementLevel };
+
+            // Kaydet
+            SaveData data = new SaveData
+            {
+                PlayerName = _playerName,
+                PositionX = _player.Position.X,
+                PositionY = _player.Position.Y,
+                Level = _player.Level,
+                Experience = _player.Experience,
+                CurrentHealth = _player.CurrentHealth,
+                MaxHealth = _player.MaxHealth,
+                Gold = _player.Gold, 
+                InventoryItems = _inventory.GetItemsForSave(),
+                EquippedWeapon = savedWeapon,
+                EquippedArmor = savedArmor
+            };
+            
+            SaveManager.SaveGame(data);
+        }
+    }
+
+    protected override void LoadContent()
+    {
+        _spriteBatch = new SpriteBatch(GraphicsDevice);
+        
+        // Pixel texture for UI elements
+        _pixelTexture = new Texture2D(GraphicsDevice, 1, 1);
+        _pixelTexture.SetData(new[] { Color.White });
+        
+        // Font yükle
+        _gameFont = Content.Load<SpriteFont>("GameFont");
+
+        // Oyuncu oluştur
+        Vector2 startPosition = new Vector2(
+            _graphics.PreferredBackBufferWidth / 2f - 24,
+            _graphics.PreferredBackBufferHeight / 2f - 32
+        );
+
+        _player = new Player(GraphicsDevice, startPosition);
+        
+        // Oyuncu saldırı event'i
+        _player.OnAttackHit += (enemy, damage) =>
+        {
+            // Hasar sayısı ekle
+            _damageNumbers.Add(new DamageNumber(
+                enemy.Position + new Vector2(0, -30),
+                damage,
+                Color.Yellow
+            ));
+            
+            // Eğer öldüyse XP ve Altın kazan
+            if (enemy.IsDead)
+            {
+                // XP
+                int xpAmount = enemy.Type == EnemyType.Demon ? 50 : 10;
+                _player.GainExperience(xpAmount);
+                
+                // Altın (Goblin: 1-5, Demon: 10-20)
+                int goldAmount = enemy.Type == EnemyType.Demon ? 
+                    new Random().Next(10, 21) : 
+                    new Random().Next(1, 6);
+                
+                _player.GainGold(goldAmount);
+                
+                // XP Popup
+                 _damageNumbers.Add(new DamageNumber(
+                    enemy.Position + new Vector2(0, -50),
+                    xpAmount,
+                    Color.Cyan 
+                ));
+                
+                // Altın Popup
+                 _damageNumbers.Add(new DamageNumber(
+                    enemy.Position + new Vector2(20, -40), // XP'nin biraz yanı
+                    goldAmount, // Sadece sayı
+                    Color.Gold // Altın rengi
+                ));
+                
+                // === LOOT DROP ===
+                var drops = LootManager.GetLoot(enemy.Type);
+                foreach(var drop in drops)
+                {
+                    bool added = _inventory.AddItem(drop.ItemId, drop.Quantity);
+                    if(added)
+                    {
+                        Item itemDrop = ItemDatabase.GetItem(drop.ItemId);
+                        
+                        // Drop bildirimi
+                        _damageNumbers.Add(new DamageNumber(
+                            enemy.Position + new Vector2(0, -60), // Daha yukarıda
+                            0, // Hasar yok
+                            itemDrop.GetRarityColor()
+                        ) { CustomText = itemDrop.Name }); // CustomText özelliği eklemeliyiz veya DamageNumber'ı modifiye etmeliyiz
+                    }
+                }
+            }
+        };
+        
+        // Item veritabanını başlat
+        ItemDatabase.Initialize(GraphicsDevice);
+        LootManager.Initialize(); // Loot tablolarını yükle
+        
+        // Envanter oluştur
+        _inventory = new Inventory(GraphicsDevice, 
+            GraphicsDevice.Viewport.Width, 
+            GraphicsDevice.Viewport.Height);
+            
+        // Arka Plan Texture Oluştur
+        _backgroundTexture = CreateDungeonFloor();
+        
+        // Başlangıç Eşyaları (Login sonrası eklenecek, buradakileri kaldırıyoruz)
+        // _inventory.AddItem(1); 
+        // _inventory.AddItem(3);
+        
+        // Envanter event'lerini bağla
+        _inventory.OnWeaponEquipped += (weapon) => _player.EquipWeapon(weapon);
+        _inventory.OnArmorEquipped += (armor) => _player.EquipArmor(armor);
+        _inventory.OnEnhancementTargetSelected += (item) => 
+        {
+            _enhancementUI.Open(item, _player, _inventory);
+        };
+        
+        // Enhancement UI
+        _enhancementUI = new EnhancementUI(GraphicsDevice, 
+            _graphics.PreferredBackBufferWidth,
+            _graphics.PreferredBackBufferHeight);
+        
+        // Enemy Manager oluştur
+        _enemyManager = new EnemyManager(GraphicsDevice);
+        
+        // Cursor Textures (Basitçe pixelden oluşturuyoruz veya yüklüyoruz)
+        // Cursor için basit bir logic ekleyeceğiz, texture yerine.
+        
+        // Düşman saldırı event'i - oyuncu hasar alınca
+        _enemyManager.OnPlayerDamaged += (damage) =>
+        {
+            _player.TakeDamage(damage);
+            
+            // Kırmızı hasar sayısı
+            _damageNumbers.Add(new DamageNumber(
+                _player.Center + new Vector2(0, -40),
+                damage,
+                new Color(255, 80, 80) // Kırmızı
+            ));
+        };
+        
+        // Düşman gruplarını spawn et (haritanın farklı yerlerinde)
+        SpawnEnemyGroups();
+    }
+    
+    private void SpawnEnemyGroups()
+    {
+        int screenWidth = GraphicsDevice.Viewport.Width;
+        int screenHeight = GraphicsDevice.Viewport.Height;
+        
+        // --- Şeytanlar (Zorlu düşmanlar - daha az sayıda) ---
+        // Üst orta
+        _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.5f, screenHeight * 0.2f), EnemyType.Demon, 2);
+        // Alt orta
+        _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.5f, screenHeight * 0.8f), EnemyType.Demon, 2);
+        
+        // --- Goblinler (Kolay düşmanlar - kalabalık) ---
+        // Sol taraf
+        _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.15f, screenHeight * 0.5f), EnemyType.Goblin, 5);
+        // Sağ taraf
+        _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.85f, screenHeight * 0.5f), EnemyType.Goblin, 5);
+        
+        // Köşeler
+        _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.1f, screenHeight * 0.1f), EnemyType.Goblin, 3);
+        _enemyManager.SpawnGroup(new Vector2(screenWidth * 0.9f, screenHeight * 0.9f), EnemyType.Goblin, 3);
+    }
+
+    protected override void Update(GameTime gameTime)
+    {
+        TotalTime = gameTime.TotalGameTime.TotalSeconds;
+        
+        KeyboardState currentKeyState = Keyboard.GetState();
+        MouseState currentMouseState = Mouse.GetState();
+        _currentKeyState = currentKeyState;
+        
+        // F11 ve Alt+Enter her zaman çalışsın
+        bool f11Pressed = currentKeyState.IsKeyDown(Keys.F11) && !_previousKeyState.IsKeyDown(Keys.F11);
+        bool altEnterPressed = (currentKeyState.IsKeyDown(Keys.LeftAlt) || currentKeyState.IsKeyDown(Keys.RightAlt)) 
+                               && currentKeyState.IsKeyDown(Keys.Enter) && !_previousKeyState.IsKeyDown(Keys.Enter);
+        
+        if (f11Pressed || altEnterPressed)
+        {
+            ToggleFullScreen();
+            _inventory.UpdateScreenSize(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+        }
+        
+        if (_currentState == GameState.Login)
+        {
+            // Login logic
+            // TextInput ile handle ediliyor, burada ESC kontrolü yapabiliriz
+            if (currentKeyState.IsKeyDown(Keys.Escape)) Exit();
+            
+            _previousKeyState = currentKeyState;
+            base.Update(gameTime);
+            return;
+        }
+
+        // --- GAME PLAYING ---
+        float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+        // Enhancement UI açıkken alt tarafı update etme
+        if (_enhancementUI.IsOpen)
+        {
+            _enhancementUI.Update(gameTime);
+            base.Update(gameTime);
+            return;
+        }
+
+        if (currentKeyState.IsKeyDown(Keys.Escape) && !_previousKeyState.IsKeyDown(Keys.Escape))
+        {
+            if (!_inventory.IsOpen) Exit();
+        }
+        
+        // Envanteri güncelle
+        _inventory.Update(gameTime, currentKeyState, currentMouseState);
+        
+        if (_inventory.IsOpen)
+        {
+            IsMouseVisible = true;
+        }
+        else
+        {
+           IsMouseVisible = !_graphics.IsFullScreen;
+            
+           // Oyuncu ve Düşmanlar
+           _player.Update(gameTime, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+           _player.UpdateCombat(gameTime, _enemyManager);
+           _enemyManager.Update(gameTime, _player.Center, _player.Bounds);
+        }
+        
+        // Hasar sayıları
+        for (int i = _damageNumbers.Count - 1; i >= 0; i--)
+        {
+            _damageNumbers[i].Update(deltaTime);
+            if (_damageNumbers[i].IsExpired) _damageNumbers.RemoveAt(i);
+        }
+        
+        _previousKeyState = currentKeyState;
+        base.Update(gameTime);
+    }
+    
+    private void ToggleFullScreen()
+    {
+        if (_graphics.IsFullScreen)
+        {
+            _graphics.PreferredBackBufferWidth = 1280;
+            _graphics.PreferredBackBufferHeight = 720;
+            _graphics.IsFullScreen = false;
+            IsMouseVisible = true;
+        }
+        else
+        {
+            _graphics.PreferredBackBufferWidth = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width;
+            _graphics.PreferredBackBufferHeight = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Height;
+            _graphics.IsFullScreen = true;
+            IsMouseVisible = false;
+        }
+        _graphics.ApplyChanges();
+    }
+
+    protected override void Draw(GameTime gameTime)
+    {
+        GraphicsDevice.Clear(Color.Black);
+
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointWrap); // PointWrap önemli!
+        
+        // --- ARKA PLAN ÇİZİMİ ---
+        // Ekranı kaplayacak şekilde "Tile" olarak çiziyoruz
+        if (_currentState != GameState.Login)
+        {
+            Rectangle screenRect = new Rectangle(0, 0, _graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight);
+            // Source rectangle'ı ekran boyutunda yaparak texture'ın tekrarlanmasını sağlıyoruz (Wrap modu sayesinde)
+            _spriteBatch.Draw(_backgroundTexture, Vector2.Zero, screenRect, Color.White);
+        }
+        else
+        {
+             // Login ekranı için daha koyu/farklı bir mod ya da aynısı
+             Rectangle screenRect = new Rectangle(0, 0, _graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight);
+             _spriteBatch.Draw(_backgroundTexture, Vector2.Zero, screenRect, new Color(50, 50, 50)); // Karartılmış
+        }
+
+        if (_currentState == GameState.Login)
+        {
+            string title = "The Warrior's Eternal Journey";
+            string prompt = "Isminizi girin: " + _playerName + "_";
+            string info = "[Enter] Basla";
+            
+            Vector2 screenCenter = new Vector2(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f);
+            
+            Vector2 titleSize = _gameFont.MeasureString(title);
+            Vector2 promptSize = _gameFont.MeasureString(prompt);
+            
+            _spriteBatch.DrawString(_gameFont, title, screenCenter - titleSize / 2 - new Vector2(0, 50), Color.Gold);
+            _spriteBatch.DrawString(_gameFont, prompt, screenCenter - promptSize / 2, Color.White);
+            _spriteBatch.DrawString(_gameFont, info, screenCenter - promptSize / 2 + new Vector2(0, 40), Color.Gray);
+        }
+        else
+        {
+            // Düşmanları çiz
+            _enemyManager.Draw(_spriteBatch);
+        
+        // Oyuncuyu çiz
+        _player.Draw(_spriteBatch);
+        
+        // Hasar sayılarını çiz
+        foreach (var dmgNum in _damageNumbers)
+        {
+            dmgNum.Draw(_spriteBatch, _gameFont);
+        }
+        } // else kapanışı
+
+        _spriteBatch.End();
+        
+        if (_currentState == GameState.Playing)
+        {
+            // UI Layer
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
+            
+            // Oyuncu sağlık barı (üst sol)
+            DrawPlayerHealthBar();
+            
+            // Envanter
+            _inventory.Draw(_spriteBatch, _gameFont);
+            
+            // Eğer Enhancement Mode'daysa bilgi yaz
+            if (_inventory.IsEnhancementMode)
+            {
+               string modeText = "BIR ESYAYA TIKLA (YUKSELTME ICIN)";
+               Vector2 textSize = _gameFont.MeasureString(modeText);
+               Vector2 mousePos = new Vector2(Mouse.GetState().X, Mouse.GetState().Y);
+               _spriteBatch.DrawString(_gameFont, modeText, mousePos + new Vector2(15, 15), Color.Cyan);
+            }
+            
+            _spriteBatch.End();
+            
+            // Enhancement UI (En üstte)
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
+            _enhancementUI.Draw(_spriteBatch, _gameFont);
+            _spriteBatch.End();
+        }
+
+        base.Draw(gameTime);
+    }
+    
+    private void DrawPlayerHealthBar()
+    {
+        int barWidth = 200;
+        int barHeight = 20;
+        int barX = 20;
+        int barY = 20;
+        
+        // --- SAĞLIK BARI ---
+        // Arka plan
+        _spriteBatch.Draw(_pixelTexture, new Rectangle(barX - 2, barY - 2, barWidth + 4, barHeight + 4), new Color(30, 30, 40));
+        _spriteBatch.Draw(_pixelTexture, new Rectangle(barX, barY, barWidth, barHeight), new Color(60, 20, 20));
+        
+        // Sağlık
+        float healthPercent = (float)_player.CurrentHealth / _player.MaxHealth;
+        int healthWidth = (int)(barWidth * healthPercent);
+        _spriteBatch.Draw(_pixelTexture, new Rectangle(barX, barY, healthWidth, barHeight), new Color(180, 50, 50));
+        
+        // Parlaklık efekti
+        _spriteBatch.Draw(_pixelTexture, new Rectangle(barX, barY, healthWidth, 4), new Color(220, 80, 80));
+        
+        // Metin
+        string healthText = $"{_player.CurrentHealth}/{_player.MaxHealth}";
+        Vector2 textSize = _gameFont.MeasureString(healthText);
+        _spriteBatch.DrawString(_gameFont, healthText, 
+            new Vector2(barX + (barWidth - textSize.X) / 2, barY + 2), 
+            Color.White, 0f, Vector2.Zero, 0.8f, SpriteEffects.None, 0f);
+            
+        // --- XP BARI ---
+        int xpBarHeight = 10;
+        int xpBarY = barY + barHeight + 8;
+        
+        // Arka plan
+        _spriteBatch.Draw(_pixelTexture, new Rectangle(barX - 2, xpBarY - 2, barWidth + 4, xpBarHeight + 4), new Color(30, 30, 40));
+        _spriteBatch.Draw(_pixelTexture, new Rectangle(barX, xpBarY, barWidth, xpBarHeight), new Color(30, 30, 30));
+        
+        // XP
+        float xpPercent = (float)_player.Experience / _player.MaxExperience;
+        int xpWidth = (int)(barWidth * xpPercent);
+        Color xpColor = new Color(50, 150, 250); // Mavi
+        
+        _spriteBatch.Draw(_pixelTexture, new Rectangle(barX, xpBarY, xpWidth, xpBarHeight), xpColor);
+        _spriteBatch.Draw(_pixelTexture, new Rectangle(barX, xpBarY, xpWidth, 2), new Color(100, 200, 255)); // Parlaklık
+        
+        // Level Metni
+        string levelText = $"Lvl {_player.Level}";
+        _spriteBatch.DrawString(_gameFont, levelText, new Vector2(barX + barWidth + 10, barY + 5), new Color(255, 200, 50));
+        
+        // --- ALTIN ---
+        // Sol üst köşe, can barının üstü veya yanı
+        string goldText = $"{_player.Gold} G";
+        _spriteBatch.DrawString(_gameFont, goldText, new Vector2(barX, barY + xpBarHeight + 35), Color.Gold);
+    }
+    
+    private Texture2D CreateDungeonFloor()
+    {
+        int size = 64; // Her bir kare taşın boyutu
+        Texture2D texture = new Texture2D(GraphicsDevice, size, size);
+        Color[] data = new Color[size * size];
+        Random rnd = new Random();
+        
+        // Ana taş rengi (Koyu gri/Mavi tonlu)
+        Color baseColor = new Color(40, 45, 55);
+        
+        for (int i = 0; i < size * size; i++)
+        {
+            // Hafif gürültü (Noise)
+            int noise = rnd.Next(-5, 6);
+            data[i] = new Color(
+                Math.Clamp(baseColor.R + noise, 0, 255),
+                Math.Clamp(baseColor.G + noise, 0, 255),
+                Math.Clamp(baseColor.B + noise, 0, 255)
+            );
+        }
+        
+        // Taş kenarlıkları (Derz) - Daha koyu
+        for (int x = 0; x < size; x++)
+        {
+            data[x] = new Color(20, 20, 25); // Üst
+            data[(size-1)*size + x] = new Color(20, 20, 25); // Alt
+            
+            // İç detay (Hafif 3D efekti için üst kenara açık renk)
+            if(x > 0 && x < size-1)
+                data[size + x] = new Color(60, 65, 75); 
+        }
+        for (int y = 0; y < size; y++)
+        {
+            data[y*size] = new Color(20, 20, 25); // Sol
+            data[y*size + size-1] = new Color(20, 20, 25); // Sağ
+            
+            // İç detay (Sol kenara açık renk)
+            if(y > 0 && y < size-1)
+                data[y*size + 1] = new Color(60, 65, 75);
+        }
+        
+        texture.SetData(data);
+        return texture;
+    }
+}
+
+// Floating damage number class
+public class DamageNumber
+{
+    public Vector2 Position { get; private set; }
+    public int Damage { get; private set; }
+    public Color Color { get; private set; }
+    public float Alpha { get; private set; } = 1f;
+    public bool IsExpired => Alpha <= 0;
+    public string CustomText { get; set; } = null;
+    
+    private float _lifetime = 1.0f;
+    private float _timer = 0f;
+    private float _velocity = -50f;
+    
+    public DamageNumber(Vector2 position, int damage, Color color)
+    {
+        Position = position;
+        Damage = damage;
+        Color = color;
+    }
+    
+    public void Update(float deltaTime)
+    {
+        _timer += deltaTime;
+        Position = new Vector2(Position.X, Position.Y + _velocity * deltaTime);
+        _velocity *= 0.98f; // Yavaşla
+        
+        // Fade out
+        Alpha = 1f - (_timer / _lifetime);
+    }
+    
+    public void Draw(SpriteBatch spriteBatch, SpriteFont font)
+    {
+        if (IsExpired) return;
+        
+        string text = CustomText ?? Damage.ToString();
+        Color drawColor = new Color(Color.R, Color.G, Color.B, (int)(255 * Alpha));
+        
+        // Gölge
+        spriteBatch.DrawString(font, text, Position + new Vector2(1, 1), 
+            new Color(0, 0, 0, (int)(150 * Alpha)), 0f, Vector2.Zero, 1.2f, SpriteEffects.None, 0f);
+        
+        // Ana metin
+        spriteBatch.DrawString(font, text, Position, drawColor, 0f, Vector2.Zero, 1.2f, SpriteEffects.None, 0f);
+    }
+}
