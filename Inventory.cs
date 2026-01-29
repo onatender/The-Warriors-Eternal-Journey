@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Audio;
 
 namespace EternalJourney;
 
@@ -66,6 +67,20 @@ public class Inventory
     private Texture2D _shieldSlotIcon;
     private Texture2D _helmetSlotIcon;
     
+    // SFX
+    private SoundEffect _sfxCoinPickup;
+    private SoundEffect _sfxCoinBuy;
+    private SoundEffect _sfxCoinSell;
+    private SoundEffect _sfxCoinDrop;
+    
+    public void SetCoinSounds(SoundEffect pickup, SoundEffect buy, SoundEffect sell, SoundEffect drop)
+    {
+        _sfxCoinPickup = pickup;
+        _sfxCoinBuy = buy;
+        _sfxCoinSell = sell;
+        _sfxCoinDrop = drop;
+    }
+    
     // Pozisyon
     private Vector2 _position;
     private Rectangle _bounds;
@@ -111,6 +126,13 @@ public class Inventory
     
     public bool IsEnhancementMode { get; set; } = false;
     
+    private Player _player;
+    
+    public void SetPlayer(Player player)
+    {
+        _player = player;
+    }
+    
     // ShopUI için slot erişimi
     public InventorySlot GetSlot(int page, int y, int x)
     {
@@ -146,8 +168,8 @@ public class Inventory
         // Pozisyonu hesapla (ekranın ortası)
         CalculatePosition();
         
-        // Başlangıç item'ı ekle - Tahta Kılıç
-        AddItem(1, 1);
+        // Başlangıç item'ı ekle - Artık TitleScreen/Game1.cs start kısmında yapılıyor.
+        // AddItem(1, 1);
     }
     
     private void CreateTextures(GraphicsDevice graphicsDevice)
@@ -469,11 +491,12 @@ public class Inventory
     
     public void Update(GameTime gameTime, KeyboardState currentKeyState, MouseState currentMouseState)
     {
-        // E tuşu ile aç/kapa
-        if (currentKeyState.IsKeyDown(Keys.E) && !_previousKeyState.IsKeyDown(Keys.E))
+        // I tuşu ile aç/kapa
+        if (currentKeyState.IsKeyDown(Keys.I) && !_previousKeyState.IsKeyDown(Keys.I))
         {
             IsOpen = !IsOpen;
             _selectedSlot = null; // Seçimi sıfırla
+            if (IsOpen) _player?.StopMoving();
         }
         
         if (IsOpen)
@@ -749,6 +772,20 @@ public class Inventory
                     SwapOrMove(slot, ArmorSlot);
                     OnArmorEquipped?.Invoke(ArmorSlot.Item);
                 }
+                else if (slot.Item.Type == ItemType.Consumable)
+                {
+                    // Potions
+                    if (_player != null)
+                    {
+                        _player.Heal(slot.Item.Health);
+                        // Reduce quantity
+                        slot.Quantity--;
+                        if (slot.Quantity <= 0)
+                        {
+                            slot.Item = null;
+                        }
+                    }
+                }
                 else if (slot.Item.Type == ItemType.Shield)
                 {
                     // Kalkanı giy
@@ -962,7 +999,7 @@ public class Inventory
         }
         
         // Kontrol ipuçları
-        string hint = "[E] Kapat  [Sag Tik] Giy/Cikar";
+        string hint = "[E] Kapat  [Sag Tik] Giy/Kullan/Cikar";
         Vector2 hintPos = new Vector2(_position.X + 20, _position.Y + _bounds.Height - 18);
         spriteBatch.DrawString(font, hint, hintPos, new Color(150, 150, 150), 
             0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
@@ -1155,8 +1192,8 @@ public class Inventory
         if (item == null) return false;
         
         // 1. Önce mevcutları kontrol et (Stacking)
-        // Sadece +0 (Geliştirilmemiş) eşyalar birleşebilir
-        if (item.EnhancementLevel == 0)
+        // Sadece Materials (Malzemeler) ve +0 items birleşebilir. Ekipmanlar birleşmez.
+        if (item.Type == ItemType.Material && item.EnhancementLevel == 0)
         {
             for (int p = 0; p < PAGE_COUNT; p++)
             {

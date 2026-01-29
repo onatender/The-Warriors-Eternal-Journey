@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Audio;
 
 namespace EternalJourney;
 
@@ -27,7 +28,7 @@ public class ShopUI
     private const int GRID_ROWS = 6;
     
     // Satıcının satılık item ID'leri
-    private List<int> _shopItemIds = new List<int> { 1, 2, 3, 10, 11, 40, 41, 50, 51, 99, 20, 21, 22, 30, 31 };
+    private List<int> _shopItemIds = new List<int> { 1, 2, 3, 10, 11, 40, 41, 50, 51, 99, 25, 20, 21, 22, 30, 31 };
     
     // Hover
     private int _hoveredPlayerSlot = -1; // Hangi oyuncu slotuna hover edildi
@@ -49,6 +50,16 @@ public class ShopUI
     private int _playerScrollOffset = 0;
     private int _shopScrollOffset = 0;
     
+    // SFX
+    private SoundEffect _sfxBuy;
+    private SoundEffect _sfxSell;
+    
+    public void SetCoinSounds(SoundEffect buy, SoundEffect sell)
+    {
+        _sfxBuy = buy;
+        _sfxSell = sell;
+    }
+
     public ShopUI(GraphicsDevice graphicsDevice, int screenWidth, int screenHeight)
     {
         _screenWidth = screenWidth;
@@ -257,6 +268,7 @@ public class ShopUI
             if (_inventory.AddItem(itemId, 1))
             {
                 _player.LoseGold(item.BuyPrice);
+                _sfxBuy?.Play();
             }
         }
     }
@@ -274,6 +286,7 @@ public class ShopUI
             if (slot.Quantity <= 0) slot.Clear();
             
             _player.GainGold(sellPrice);
+            _sfxSell?.Play();
         }
     }
     

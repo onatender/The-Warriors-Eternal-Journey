@@ -16,6 +16,7 @@ public class SaveData
     public int CurrentHealth { get; set; }
     public int MaxHealth { get; set; }
     public int Gold { get; set; }
+    public int MapIndex { get; set; } = 1; // Default to Map 1
     
     // Envanter
     public List<SavedItem> InventoryItems { get; set; } = new List<SavedItem>();
@@ -48,19 +49,19 @@ public static class SaveManager
         return folder;
     }
 
-    private static string GetSavePath(string playerName)
+    private static string GetSavePath(int slotIndex)
     {
-        return Path.Combine(GetSaveDirectory(), $"{playerName}.json");
+        return Path.Combine(GetSaveDirectory(), $"save_slot_{slotIndex}.json");
     }
 
-    public static void SaveGame(SaveData data)
+    public static void SaveGame(SaveData data, int slotIndex)
     {
         try
         {
-            string path = GetSavePath(data.PlayerName);
+            string path = GetSavePath(slotIndex);
             string json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(path, json);
-            System.Diagnostics.Debug.WriteLine($"Oyun kaydedildi: {path}");
+            System.Diagnostics.Debug.WriteLine($"Oyun slot {slotIndex}'e kaydedildi: {path}");
         }
         catch (Exception ex)
         {
@@ -68,11 +69,11 @@ public static class SaveManager
         }
     }
 
-    public static SaveData LoadGame(string playerName)
+    public static SaveData LoadGame(int slotIndex)
     {
         try
         {
-            string path = GetSavePath(playerName);
+            string path = GetSavePath(slotIndex);
             if (!File.Exists(path)) return null;
             
             string json = File.ReadAllText(path);
@@ -80,8 +81,18 @@ public static class SaveManager
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Yükleme hatası: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Yükleme hatası (Slot {slotIndex}): {ex.Message}");
             return null;
         }
+    }
+    
+    public static SaveData[] GetSaveSlots()
+    {
+        SaveData[] slots = new SaveData[3];
+        for (int i = 0; i < 3; i++)
+        {
+            slots[i] = LoadGame(i);
+        }
+        return slots;
     }
 }

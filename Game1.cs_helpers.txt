@@ -1,0 +1,28 @@
+    private Texture2D CreateStatsIcon(GraphicsDevice gd, int size)
+    {
+        Texture2D texture = new Texture2D(gd, size, size);
+        Color[] data = new Color[size * size];
+        for (int i = 0; i < data.Length; i++) data[i] = Color.Transparent;
+
+        Color frameColor = Color.Gold;
+        Color paperColor = Color.White;
+
+        for (int y = 5; y < size - 5; y++)
+        {
+            for (int x = 10; x < size - 10; x++)
+            {
+                // Paper
+                data[y * size + x] = paperColor;
+                
+                // Lines
+                if ((y == 15 || y == 25 || y == 35 || y == 45) && x > 15 && x < size - 15)
+                    data[y * size + x] = Color.Gray;
+
+                // Frame
+                if (x == 10 || x == size - 11 || y == 5 || y == size - 6)
+                    data[y * size + x] = frameColor;
+            }
+        }
+        texture.SetData(data);
+        return texture;
+    }

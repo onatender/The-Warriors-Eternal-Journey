@@ -43,6 +43,27 @@ public class Player
     public float GetAttackRadius() => _attackRadius;
     public Enemy GetCurrentTarget() => _currentTarget;
     
+    // --- SKILL SYSTEM FIELDS ---
+    public SkillManager SkillManager { get; private set; }
+    
+    // States
+    private bool _isSpinning = false;
+    private float _spinTimer = 0f;
+    private float _spinDuration = 2.0f; // Increased to 2.0s
+    private float _spinDamageTimer = 0f;
+    
+    private bool _isDashing = false;
+    private Enemy _dashTarget;
+    private List<Enemy> _dashedEnemies = new List<Enemy>();
+    private int _dashCount = 0;
+    private const int MAX_DASH_CHAIN = 4;
+    private float _dashSpeed = 1500f; // Very fast
+    
+    public void InitializeSkills(GraphicsDevice gd)
+    {
+        SkillManager = new SkillManager(gd);
+    }
+    
     // SFX
     private SoundEffect _sfxSlice1;
     private SoundEffect _sfxSlice2;
@@ -76,6 +97,8 @@ public class Player
         public float Life;
         public float Decay;
         public bool IsBehind; // Karakterin arkasında mı?
+        public float Rotation; // Added
+        public Vector2 Scale; // Added
     }
     private List<PlayerParticle> _particles = new List<PlayerParticle>();
     
@@ -109,6 +132,16 @@ public class Player
     public Vector2 Position => _position;
     public void SetPosition(Vector2 newPos) { _position = newPos; }
     
+    public void StopMoving()
+    {
+        _velocity = Vector2.Zero;
+        _isMoving = false;
+        if (_walkSoundInstance != null && _walkSoundInstance.State == SoundState.Playing)
+        {
+            _walkSoundInstance.Stop();
+        }
+    }
+    
     public Vector2 Center => new Vector2(_position.X + _width / 2, _position.Y + _height / 2);
     public Rectangle Bounds => new Rectangle((int)_position.X, (int)_position.Y, _width, _height);
     
@@ -120,25 +153,16 @@ public class Player
         set 
         {
             _level = value;
-            // Level değişince MaxXP'yi güncelle
             MaxExperience = (long)(100 * Math.Pow(_level, 1.2));
         }
     }
     
-    public int CurrentHealth { get; set; } = 100;
-    public int MaxHealth { get; set; } = 100;
-    
-    // XP Sistemi
-    public long Experience { get; private set; } = 0;
-    public long MaxExperience { get; private set; } = 100; 
-    public const int MAX_LEVEL = 99;
-    
-    // Altın Sistemi
-    public int Gold { get; private set; } = 0;
+    public static SoundEffect SfxCoinPickup;
     
     public void GainGold(int amount)
     {
         Gold += amount;
+        SfxCoinPickup?.Play();
     }
     
     public void LoseGold(int amount)
@@ -146,6 +170,19 @@ public class Player
         Gold -= amount;
         if (Gold < 0) Gold = 0;
     }
+    
+    public int CurrentHealth { get; set; } = 100;
+    public int MaxHealth { get; set; } = 100;
+    
+    // XP Sistemi
+    public long Experience { get; set; } = 0;
+    public long MaxExperience { get; private set; } = 100; 
+    public const int MAX_LEVEL = 99;
+    
+    // Altın Sistemi
+    public int Gold { get; set; } = 0;
+    
+
     
     // Ekipman - Kalkan ve Kask
     private Item _equippedShield = null;
@@ -170,8 +207,14 @@ public class Player
         if (_equippedShield == null) return false;
         
         // Bloklama şansı = Kalkanın BlockChance + (Seviye * 2)
-        int blockChance = _equippedShield.BlockChance + (_equippedShield.EnhancementLevel * 2);
+        int blockChance = GetBlockChance();
         return _random.Next(100) < blockChance;
+    }
+
+    public int GetBlockChance()
+    {
+        if (_equippedShield == null) return 0;
+        return _equippedShield.BlockChance + (_equippedShield.EnhancementLevel * 2);
     }
     
     // Toplam Savunma Hesapla (Zırh + Kalkan + Kask)
@@ -518,6 +561,28 @@ public class Player
         }
     }
     
+    public void Heal(int amount)
+    {
+        CurrentHealth += amount;
+        if (CurrentHealth > MaxHealth) CurrentHealth = MaxHealth;
+        
+        // Healing Effect (Green Particles)
+        for(int i=0; i<15; i++)
+        {
+            Vector2 pos = Center + new Vector2(_random.Next(-20, 20), _random.Next(-30, 30));
+            _particles.Add(new PlayerParticle
+            {
+                Position = pos,
+                Velocity = new Vector2(_random.Next(-20, 20), _random.Next(-50, -10)), // Upward float
+                Color = Color.LightGreen,
+                Size = _random.Next(3, 6),
+                Life = 1.0f,
+                Decay = 1.0f,
+                IsBehind = false
+            });
+        }
+    }
+    
     public void TakeDamage(int damage)
     {
         CurrentHealth -= damage;
@@ -582,19 +647,264 @@ public class Player
         CreateTexture(_graphicsDevice); 
         CreateLegTexture(_graphicsDevice); // Bacakları güncelle
     }
-    
-    public void Update(GameTime gameTime, int mapWidth, int mapHeight)
+
+    // --- SKILL LOGIC ---
+    public void UpdateSkills(GameTime gameTime, EnemyManager enemyManager)
     {
-        float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-        KeyboardState keyState = Keyboard.GetState();
+        if (_equippedWeapon == null)
+        {
+            // For testing: Equip default sword if none
+            // This ensures skills work even if save data is weird
+            // But ideally we should have a weapon from start.
+            // Let's just return for now, but maybe log it?
+            return; 
+        }
         
-        _velocity = Vector2.Zero;
+        SkillManager.Update(gameTime);
+        
+        KeyboardState kState = Keyboard.GetState();
+        
+        // Skill 1: Whirlwind (Key 1 or Q)
+        if ((kState.IsKeyDown(Keys.D1) || kState.IsKeyDown(Keys.Q)) && !_isSpinning && !_isDashing)
+        {
+            var skill = SkillManager.GetSkill(SkillType.Whirlwind);
+            if (skill != null && skill.IsReady)
+            {
+                skill.Use();
+                StartSpin();
+            }
+        }
+        
+        // Skill 2: Dash Strike (Key 2 or E)
+        if ((kState.IsKeyDown(Keys.D2) || kState.IsKeyDown(Keys.E)) && !_isSpinning && !_isDashing)
+        {
+             var skill = SkillManager.GetSkill(SkillType.DashStrike);
+             if (skill != null && skill.IsReady)
+             {
+                 // Try to find target
+                 Enemy target = enemyManager.GetNearestEnemy(Center, 400f);
+                 if (target != null)
+                 {
+                     skill.Use();
+                     StartDash(target);
+                 }
+             }
+        }
+    }
+    
+    private void StartSpin()
+    {
+        _isSpinning = true;
+        _spinTimer = 0f;
+        // Start cleanly, damage will trigger after first rotation completes (~0.3s)
+        // OR set to threshold to trigger instantly? User prefers instant usually.
+        // Let's set to 0. It takes 0.3s to do a 360 spin. It makes sense to hit AFTER the swing passes.
+        // But if user complains about "no damage", maybe instant is better?
+        // User said: "kılıç dönerken her turda hasar vermeli" -> imply continuous.
+        // I will stick to 0 for now. The bug was in Enemy.cs.
+        _spinDamageTimer = 0f; 
+    }
+    
+    private void UpdateSpin(GameTime gameTime, EnemyManager enemyManager)
+    {
+        float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+        _spinTimer += dt;
+        _spinDamageTimer += dt;
+        
+        // Visual Rotation Speed
+        float spinSpeed = 20f;
+        float timePerRotation = MathHelper.TwoPi / spinSpeed; // ~0.31s
+
+        // Damage Tick every rotation
+        if (_spinDamageTimer >= timePerRotation)
+        {
+            _spinDamageTimer -= timePerRotation; // Keep exact sync
+            
+            // AoE Damage
+            var targets = enemyManager.GetEnemiesInArea(Center, 120f, 0); // Increased range slightly
+             foreach (var target in targets)
+            {
+                // Rebalanced: Normal Damage per hit (1.0f)
+                int damage = (int)(_random.Next(_equippedWeapon.MinDamage, _equippedWeapon.MaxDamage) * 1.0f); 
+                target.TakeDamage(damage);
+                OnAttackHit?.Invoke(target, damage);
+                
+                // Hit effect
+                 _particles.Add(new PlayerParticle
+                 {
+                    Position = target.Position + new Vector2(_random.Next(-10,10), _random.Next(-20,0)), // Higher up for visibility
+                    Color = Color.White,
+                    Size = 3,
+                    Life = 0.3f,
+                    Decay = 3f
+                 });
+            }
+            
+            // Spin Sound Effect (looping slice?)
+            if (_random.Next(2)==0) _sfxSlice1?.Play(0.2f, 0.5f, 0f); // Higher pitch for speed
+        }
+        
+        // Particles
+        for(int i=0; i<2; i++)
+        {
+             float angle = _spinTimer * 20f + i * MathHelper.Pi;
+             Vector2 offset = new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 40f;
+             _particles.Add(new PlayerParticle
+             {
+                Position = Center + offset,
+                Velocity = -offset * 2f, // inwards
+                Color = Color.Cyan,
+                Size = 4,
+                Life = 0.4f,
+                Decay = 2f
+             });
+        }
+        
+        if (_spinTimer >= _spinDuration)
+        {
+            _isSpinning = false;
+        }
+    }
+    
+    private void StartDash(Enemy target)
+    {
+        _isDashing = true;
+        _dashTarget = target;
+        _dashCount = 0;
+        _dashedEnemies.Clear();
+        _dashedEnemies.Add(target);
+    }
+    
+    private void UpdateDash(GameTime gameTime, EnemyManager enemyManager)
+    {
+         if (_dashTarget == null || _dashTarget.IsDead)
+         {
+             // Target lost, try to find next or stop
+             FindNextDashTarget(enemyManager);
+             if (_dashTarget == null) 
+             {
+                 _isDashing = false;
+                 return;
+             }
+         }
+         
+         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+         Vector2 dir = _dashTarget.Position - _position;
+         float dist = dir.Length();
+         
+         if (dist < 20f) // Reached (increased hit radius slightly)
+         {
+             // Deal Damage
+             int damage = (int)(_random.Next(_equippedWeapon.MinDamage, _equippedWeapon.MaxDamage) * 2.5f); // Was 1.5f, now 250% damage
+             _dashTarget.TakeDamage(damage);
+             OnAttackHit?.Invoke(_dashTarget, damage);
+             _sfxSlice2?.Play(0.6f, 0.2f, 0f);
+             
+             // Visual Hit Impact
+             _isAttacking = true; 
+             _attackTimer = MathF.PI / 2; // Mid-swing visual
+             
+             // Chain
+             _dashCount++;
+             if (_dashCount < MAX_DASH_CHAIN)
+             {
+                 FindNextDashTarget(enemyManager);
+             }
+             else
+             {
+                 _isDashing = false;
+                 _isAttacking = false; // Reset attack visual
+             }
+         }
+         else
+         {
+             // Move
+             dir.Normalize();
+             _position += dir * _dashSpeed * dt;
+             
+             // Wind/Smoke Trail Effect
+             if (_random.NextDouble() < 0.6) // Frequent
+             {
+                 _particles.Add(new PlayerParticle
+                 {
+                    Position = _position + new Vector2(_random.Next(0, 20), _height - 10), // Near feet/ground
+                    Velocity = new Vector2(-dir.X * 20, -10), // Slight uplift
+                    Color = new Color(200, 200, 200, 100), // Grayish Smoke
+                    Size = _random.Next(10, 20),
+                    Scale = Vector2.One, 
+                    Rotation = (float)_random.NextDouble() * MathHelper.TwoPi,
+                    Life = 0.8f, 
+                    Decay = 1.0f,
+                    IsBehind = true
+                 });
+                 // Add a second expanding ring? Or just simple smoke for now.
+             }
+         }
+    }
+    
+    private void FindNextDashTarget(EnemyManager enemyManager)
+    {
+        var enemies = enemyManager.GetAllEnemies(); // Assuming method exists or we use area
+        Enemy best = null;
+        float minDist = 300f; // Chain range
+        
+        foreach(var enemy in enemies)
+        {
+            if (enemy.IsDead || _dashedEnemies.Contains(enemy)) continue;
+            
+            float d = Vector2.Distance(_position, enemy.Position);
+            if (d < minDist)
+            {
+                minDist = d;
+                best = enemy;
+            }
+        }
+        
+        _dashTarget = best;
+        if (best != null) _dashedEnemies.Add(best);
+        else _isDashing = false;
+    }
+
+    public void Update(GameTime gameTime, int mapWidth, int mapHeight, EnemyManager enemyManager, Vector2 joystickInput = default)
+    {
+        // Skill State Updates
+        if (_isDashing)
+        {
+             UpdateDash(gameTime, enemyManager);
+             return; 
+        }
+        if (_isSpinning)
+        {
+            UpdateSpin(gameTime, enemyManager);
+            _speed = 150f; // Slower movement while spinning
+        }
+        else
+        {
+            _speed = 300f; // Normal speed
+        }
+        float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+        
+        // Input Handling
+        _velocity = joystickInput;
+        
+        KeyboardState keyState = Keyboard.GetState();
         if (keyState.IsKeyDown(Keys.W) || keyState.IsKeyDown(Keys.Up)) _velocity.Y -= 1;
         if (keyState.IsKeyDown(Keys.S) || keyState.IsKeyDown(Keys.Down)) _velocity.Y += 1;
-        if (keyState.IsKeyDown(Keys.A) || keyState.IsKeyDown(Keys.Left)) { _velocity.X -= 1; _facingDirection = -1; }
-        if (keyState.IsKeyDown(Keys.D) || keyState.IsKeyDown(Keys.Right)) { _velocity.X += 1; _facingDirection = 1; }
+        if (keyState.IsKeyDown(Keys.A) || keyState.IsKeyDown(Keys.Left)) { _velocity.X -= 1; }
+        if (keyState.IsKeyDown(Keys.D) || keyState.IsKeyDown(Keys.Right)) { _velocity.X += 1; }
         
-        _isMoving = _velocity != Vector2.Zero;
+        if (_velocity != Vector2.Zero)
+        {
+            if (_velocity.X > 0) _facingDirection = 1;
+            else if (_velocity.X < 0) _facingDirection = -1;
+            
+            _isMoving = true;
+            _velocity.Normalize();
+        }
+        else
+        {
+            _isMoving = false;
+        }
         
         // Yürüyüş Sesi Kontrolü
         if (_walkSoundInstance != null)
@@ -696,7 +1006,16 @@ public class Player
         // 1. Arkadaki Parçacıklar
         foreach(var p in _particles) {
             if(p.IsBehind) 
-                spriteBatch.Draw(_pixelTexture, new Rectangle((int)p.Position.X, (int)p.Position.Y, (int)p.Size, (int)p.Size), p.Color * p.Life);
+            {
+                 Vector2 origin = new Vector2(p.Size / 2f, p.Size / 2f);
+                 // If Scale is zero (old particles), use Vector2.One * p.Size adjustment? 
+                 // Actually Size was used as width/height. Textures are 1x1 pixel? No, _pixelTexture is 1x1.
+                 // So we scale 1x1 pixel by Size * Scale.
+                 // Size was width before.
+                 Vector2 scale = p.Scale == Vector2.Zero ? new Vector2(p.Size) : p.Scale * p.Size;
+                 
+                 spriteBatch.Draw(_pixelTexture, p.Position, null, p.Color * p.Life, p.Rotation, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            }
         }
     
         // Animasyon Değerleri
@@ -774,7 +1093,10 @@ public class Player
         // 2. Öndeki Parçacıklar
         foreach(var p in _particles) {
             if(!p.IsBehind) 
-                spriteBatch.Draw(_pixelTexture, new Rectangle((int)p.Position.X, (int)p.Position.Y, (int)p.Size, (int)p.Size), p.Color * p.Life);
+            {
+                 Vector2 scale = p.Scale == Vector2.Zero ? new Vector2(p.Size) : p.Scale * p.Size;
+                 spriteBatch.Draw(_pixelTexture, p.Position, null, p.Color * p.Life, p.Rotation, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            }
         }
     }
     
@@ -844,7 +1166,12 @@ public class Player
         // Kolun açısı ne olursa olsun kılıcı dik tutmaya çalışsın (saldırı hariç)
         float weaponRot;
         
-        if (_isAttacking)
+        if (_isSpinning)
+        {
+             // Spin effect (Matches logic: 20f)
+             weaponRot = _spinTimer * 20f; 
+        }
+        else if (_isAttacking)
         {
             // Saldırırken kılıç kolu takip etsin (kesme hareketi için)
             weaponRot = finalRotation;
@@ -864,4 +1191,7 @@ public class Player
     
     public Item GetEquippedWeapon() => _equippedWeapon;
     public Item GetEquippedArmor() => _equippedArmor;
+
+    public int GetMinDamage() => _equippedWeapon?.MinDamage ?? 1;
+    public int GetMaxDamage() => _equippedWeapon?.MaxDamage ?? 3;
 }

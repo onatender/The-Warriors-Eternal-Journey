@@ -11,7 +11,8 @@ public enum ItemType
     Armor,
     Material,
     Shield,  // Kalkan
-    Helmet   // Kask
+    Helmet,   // Kask
+    Consumable // Ikser vb.
 }
 
 public enum ItemRarity
@@ -173,8 +174,9 @@ public static class ItemDatabase
             EnhancementLevel = 0,
             MinDamage = 5,
             MaxDamage = 10,
+
             AttackSpeed = 50,
-            BuyPrice = 50,
+            BuyPrice = 150, // Rebalance: 50 -> 150
             Icon = CreateWeaponIcon(graphicsDevice, new Color(139, 90, 43)) // Kahverengi tahta
         };
         
@@ -190,7 +192,7 @@ public static class ItemDatabase
             EnhancementLevel = 0,
             Defense = 5,
             Health = 10,
-            BuyPrice = 40,
+            BuyPrice = 120, // Rebalance: 40 -> 120
             Icon = CreateArmorIcon(graphicsDevice, new Color(150, 120, 90))
         };
         
@@ -206,6 +208,7 @@ public static class ItemDatabase
             EnhancementLevel = 0,
             Defense = 10,
             Health = 20,
+            BuyPrice = 400, // Rebalance: New Price
             Icon = CreateArmorIcon(graphicsDevice, new Color(120, 80, 50)) // Koyu kahve
         };
         
@@ -218,6 +221,7 @@ public static class ItemDatabase
             Type = ItemType.Material,
             Rarity = ItemRarity.Rare,
             RequiredLevel = 1,
+            BuyPrice = 250, // Rebalance: Enhancement Stone
             Icon = CreateMaterialIcon(graphicsDevice, Color.Cyan)
         };
         
@@ -229,12 +233,13 @@ public static class ItemDatabase
             Description = "Efsanelere konu olmus, sonsuz guc barindiran kilic.",
             Type = ItemType.Weapon,
             Rarity = ItemRarity.Legendary,
-            RequiredLevel = 1, // Hileli olduğu için level 1
+            RequiredLevel = 25, // Hileli olduğu için level 1
             EnhancementLevel = 0, 
             MinDamage = 100,
             MaxDamage = 150,
             AttackSpeed = 100, // Çok Hızlı
-            Icon = CreateWeaponIcon(graphicsDevice, Color.Purple)
+            Icon = CreateWeaponIcon(graphicsDevice, Color.Purple),
+            BuyPrice = 1000000 // Rebalance: Legendary Price
         };
 
         // ID 11: Ejderha Zırhı (Legendary)
@@ -245,12 +250,28 @@ public static class ItemDatabase
             Description = "Ejderha pullarindan yapilmis, asilmaz bir zirh.",
             Type = ItemType.Armor,
             Rarity = ItemRarity.Legendary,
-            RequiredLevel = 1,
+            RequiredLevel = 25,
             EnhancementLevel = 0,
-            Defense = 100,
-            Health = 1000,
+            Defense = 50,
+            Health = 200,
+            BuyPrice = 1000000,
             Icon = CreateArmorIcon(graphicsDevice, Color.DarkRed)
         };
+
+        // ID 25: Can İksiri
+        _items[25] = new Item
+        {
+            Id = 25,
+            Name = "Can Iksiri",
+            Description = "50 Can yeniler.",
+            Type = ItemType.Consumable,
+            Rarity = ItemRarity.Common,
+            RequiredLevel = 1,
+            Health = 50, // Yenilenen can miktarı
+            BuyPrice = 500,
+            Icon = CreatePotionIcon(graphicsDevice, Color.Red)
+        };
+
         
         // --- EFSUN & SUPPORT ITEMLARI ---
         
@@ -262,6 +283,7 @@ public static class ItemDatabase
             Description = "Yukseltme sansini %10 artirir.",
             Type = ItemType.Material,
             Rarity = ItemRarity.Common,
+            BuyPrice = 300, // Rebalance: +10%
             Icon = CreateScrollIcon(graphicsDevice, new Color(240, 230, 200), new Color(50, 150, 50)) // Yeşil mühürlü parşömen
         };
         
@@ -273,6 +295,7 @@ public static class ItemDatabase
             Description = "Yukseltme sansini %25 artirir.",
             Type = ItemType.Material,
             Rarity = ItemRarity.Rare,
+            BuyPrice = 750, // Rebalance: +25%
             Icon = CreateScrollIcon(graphicsDevice, new Color(255, 250, 220), new Color(50, 50, 150)) // Mavi mühürlü
         };
         
@@ -284,6 +307,7 @@ public static class ItemDatabase
             Description = "Yukseltme sansini %50 artirir!",
             Type = ItemType.Material,
             Rarity = ItemRarity.Legendary,
+            BuyPrice = 2500, // Rebalance: +50%
             Icon = CreateScrollIcon(graphicsDevice, new Color(255, 215, 0), new Color(200, 0, 0)) // Altın kağıt, kırmızı mühür
         };
         
@@ -295,6 +319,7 @@ public static class ItemDatabase
             Description = "Basarisiz yukseltmede esyanin yok olmasini engeller, ancak seviyesi duser.",
             Type = ItemType.Material,
             Rarity = ItemRarity.Rare,
+            BuyPrice = 1500, // Rebalance: Amulet
             Icon = CreateAmuletIcon(graphicsDevice, Color.Silver, Color.Gray) // Gümüş çerçeve, gri taş
         };
         
@@ -306,6 +331,7 @@ public static class ItemDatabase
             Description = "Basarisiz yukseltmede esyayi tamamen korur.",
             Type = ItemType.Material,
             Rarity = ItemRarity.Legendary,
+            BuyPrice = 5000, // Rebalance: Magic Amulet
             Icon = CreateAmuletIcon(graphicsDevice, Color.Gold, Color.Purple) // Altın çerçeve, mor taş
         };
 
@@ -322,7 +348,7 @@ public static class ItemDatabase
             RequiredLevel = 1,
             Defense = 5,
             BlockChance = 10,
-            BuyPrice = 60,
+            BuyPrice = 150, // Rebalance: 60 -> 150
             Icon = CreateShieldIcon(graphicsDevice, new Color(139, 90, 43)) // Kahverengi tahta
         };
         
@@ -337,7 +363,7 @@ public static class ItemDatabase
             RequiredLevel = 1,
             Defense = 12,
             BlockChance = 18,
-            BuyPrice = 150,
+            BuyPrice = 750, // Rebalance: 150 -> 750
             Icon = CreateShieldIcon(graphicsDevice, new Color(180, 180, 190)) // Gümüş/Demir
         };
         
@@ -354,7 +380,7 @@ public static class ItemDatabase
             RequiredLevel = 1,
             Defense = 3,
             Health = 5,
-            BuyPrice = 35,
+            BuyPrice = 150, // Rebalance: 35 -> 150
             Icon = CreateHelmetIcon(graphicsDevice, new Color(120, 80, 50)) // Kahverengi deri
         };
         
@@ -369,7 +395,7 @@ public static class ItemDatabase
             RequiredLevel = 1,
             Defense = 8,
             Health = 15,
-            BuyPrice = 100,
+            BuyPrice = 500, // Rebalance: 100 -> 500
             Icon = CreateHelmetIcon(graphicsDevice, new Color(180, 180, 190)) // Gümüş/Demir
         };
 
@@ -536,6 +562,8 @@ public static class ItemDatabase
             AttackSpeed = original.AttackSpeed,
             Defense = original.Defense,
             Health = original.Health,
+            BlockChance = original.BlockChance, // Fix: Copy BlockChance
+            BuyPrice = original.BuyPrice,       // Fix: Copy BuyPrice
             Icon = original.Icon,
             IconColor = original.IconColor
         };
@@ -754,6 +782,44 @@ public static class ItemDatabase
         }
         
         texture.SetData(colors);
+        return texture;
+    }
+    
+    private static Texture2D CreatePotionIcon(GraphicsDevice gd, Color color)
+    {
+        int size = 32;
+        Texture2D texture = new Texture2D(gd, size, size);
+        Color[] data = new Color[size * size];
+
+        float cx = size / 2f;
+        float cy = size / 2f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                int i = y * size + x;
+                float dist = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
+                
+                // Flask Shape
+                bool inNeck = Math.Abs(x - cx) < 4 && y < 10 && y > 2;
+                bool inBody = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy + 4)) < 10;
+                
+                if (inNeck || inBody)
+                {
+                    if (y > 10) data[i] = color;
+                    else data[i] = Color.Lerp(color, Color.White, 0.5f); 
+                }
+                else
+                {
+                    data[i] = Color.Transparent;
+                }
+                
+                 if ((inNeck || inBody) && (x < cx - 9 || x > cx + 9 || y < 3 || y > 26))
+                     data[i] = Color.White; // border
+            }
+        }
+        texture.SetData(data);
         return texture;
     }
 }

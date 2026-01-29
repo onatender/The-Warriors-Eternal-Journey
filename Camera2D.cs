@@ -77,4 +77,10 @@ public class Camera2D
         _mapWidth = width;
         _mapHeight = height;
     }
+
+    public void LookAt(Vector2 targetPosition)
+    {
+        Position = targetPosition;
+        Update(targetPosition); // Apply clamping immediately
+    }
 }

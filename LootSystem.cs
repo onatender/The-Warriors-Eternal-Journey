@@ -60,6 +60,7 @@ public static class LootManager
         goblinLoot.AddItem(21, 0.5); // %0.5 Şans Tılsımı %25
         goblinLoot.AddItem(30, 2.0); // %2 Muska
         goblinLoot.AddItem(40, 3.0); // %3 Tahta Kalkan (YENİ)
+        goblinLoot.AddItem(25, 2.0); // %2 Can İksiri
         _lootTables[EnemyType.Goblin] = goblinLoot;
 
         // Spider Drop Havuzu (YENİ)
@@ -68,6 +69,7 @@ public static class LootManager
         spiderLoot.AddItem(50, 4.0); // %4 Deri Kask
         spiderLoot.AddItem(40, 2.0); // %2 Tahta Kalkan
         spiderLoot.AddItem(20, 1.5); // %1.5 Şans Tılsımı %10
+        spiderLoot.AddItem(25, 2.0); // %2 Can İksiri
         _lootTables[EnemyType.Spider] = spiderLoot;
 
         // Demon Drop Havuzu
@@ -78,6 +80,7 @@ public static class LootManager
         demonLoot.AddItem(31, 0.2); // %0.2 Büyülü Muska
         demonLoot.AddItem(41, 1.5); // %1.5 Demir Kalkan (YENİ)
         demonLoot.AddItem(51, 1.5); // %1.5 Demir Kask (YENİ)
+        demonLoot.AddItem(25, 2.0); // %2 Can İksiri
         _lootTables[EnemyType.Demon] = demonLoot;
     }
 

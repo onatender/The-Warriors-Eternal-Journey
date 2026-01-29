@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Audio;
 
 namespace EternalJourney;
 
@@ -75,6 +76,17 @@ public class Enemy
     private float _smokeTimer = 0f;
     private Random _random = new Random();
     
+    // SFX (Static for shared access)
+    public static SoundEffect SfxDemonIdle;
+    public static SoundEffect SfxGoblinIdle;
+    public static SoundEffect SfxGoblinDeath;
+    
+
+    
+    // Global ses kontrolü (idle sesleri için)
+    private static float _globalIdleSoundTimer = 0f;
+    private const float MIN_IDLE_SOUND_INTERVAL = 4.0f; // En az 4 saniye ara
+    
     public event Action<int> OnAttackPlayer;
     
     public Rectangle Bounds => new Rectangle(
@@ -110,7 +122,7 @@ public class Enemy
             // Şeytan - Çok Güçlü
             _width = 44; // Biraz daha büyük
             _height = 54;
-            MaxHealth = 250; // Yüksek can
+            MaxHealth = 1250; // 5x Buff (Pre: 250)
             CurrentHealth = MaxHealth;
             MinDamage = 15;
             MaxDamage = 25;
@@ -453,6 +465,11 @@ public class Enemy
         
         _smokeTimer += deltaTime;
         
+
+        
+        // Static timer azalt
+        if (_globalIdleSoundTimer > 0) _globalIdleSoundTimer -= deltaTime;
+        
         if (_showDamageFlash)
         {
             _damageFlashTimer -= deltaTime;
@@ -521,6 +538,39 @@ public class Enemy
                         }
                         // Dururken de hafif animasyon olsun (nefes alma)
                         _animationTimer += deltaTime * 1f;
+                        
+                        // IDLE SOUNDS (Global Timer Kontrollü)
+                        if (_globalIdleSoundTimer <= 0)
+                        {
+                            bool playedSound = false;
+                            
+                            if (Type == EnemyType.Demon && SfxDemonIdle != null && _random.NextDouble() < 0.002) // Daha da nadir
+                            {
+                                float distToPlayer = Vector2.Distance(Position, playerPosition); // Uzaksa çalma
+                                if (distToPlayer < 800) 
+                                {
+                                    // Mesafeye göre ses kısıklığı
+                                    float volume = Math.Clamp(1f - (distToPlayer / 800f), 0.1f, 0.4f);
+                                    SfxDemonIdle.Play(volume, -0.2f, 0f);
+                                    playedSound = true;
+                                }
+                            }
+                            else if (Type == EnemyType.Goblin && SfxGoblinIdle != null && _random.NextDouble() < 0.005)
+                            {
+                                float distToPlayer = Vector2.Distance(Position, playerPosition);
+                                if (distToPlayer < 800)
+                                {
+                                    float volume = Math.Clamp(1f - (distToPlayer / 800f), 0.1f, 0.3f);
+                                    SfxGoblinIdle.Play(volume, 0.2f, 0f);
+                                    playedSound = true;
+                                }
+                            }
+                            
+                            if (playedSound)
+                            {
+                                _globalIdleSoundTimer = MIN_IDLE_SOUND_INTERVAL + (float)_random.NextDouble() * 2f; // 4-6 sn bekle
+                            }
+                        }
                     }
                 }
                 break;
@@ -586,7 +636,15 @@ public class Enemy
         _showDamageFlash = true;
         _damageFlashTimer = 0.15f;
         
-        if (CurrentHealth < 0) CurrentHealth = 0;
+        if (CurrentHealth <= 0) 
+        {
+            CurrentHealth = 0;
+            // Death Sound
+            if (Type == EnemyType.Goblin && SfxGoblinDeath != null)
+            {
+                SfxGoblinDeath.Play(0.5f, 0f, 0f);
+            }
+        }
     }
     
     public bool ShouldEmitSmoke()
@@ -880,7 +938,7 @@ public class EnemyManager
                     // Yön kontrolü (arkadaki düşmanlara vurmamak için)
                     // Basitçe: Düşman sağdaysa ve biz sağa bakıyorsak (veya tam tersi)
                     float dx = e.Position.X - center.X;
-                    if ((facingDir == 1 && dx > -20) || (facingDir == -1 && dx < 20))
+                    if (facingDir == 0 || (facingDir == 1 && dx > -20) || (facingDir == -1 && dx < 20))
                     {
                         targets.Add(e);
                     }
@@ -888,5 +946,18 @@ public class EnemyManager
             }
         }
         return targets;
+    }
+    
+    public List<Enemy> GetAllEnemies()
+    {
+        List<Enemy> all = new List<Enemy>();
+        foreach (var group in _groups)
+        {
+            foreach (var enemy in group.Enemies)
+            {
+                if (!enemy.IsDead) all.Add(enemy);
+            }
+        }
+        return all;
     }
 }

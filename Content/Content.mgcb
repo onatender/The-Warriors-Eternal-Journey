@@ -44,3 +44,70 @@
 /processor:SoundEffectProcessor
 /processorParam:Quality=Best
 /build:SFX/walk.mp3
+
+#begin SFX/bg_1.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/bg_1.mp3
+
+#begin SFX/bg_2.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/bg_2.mp3
+
+#begin SFX/bg_3.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/bg_3.mp3
+
+#begin SFX/bg_4.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/bg_4.mp3
+
+#begin SFX/sfx_coin_pickup.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/sfx_coin_pickup.mp3
+
+#begin SFX/sfx_coin_buy.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/sfx_coin_buy.mp3
+
+#begin SFX/sfx_coin_sell.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/sfx_coin_sell.mp3
+
+#begin SFX/sfx_coin_drop.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/sfx_coin_drop.mp3
+
+#begin SFX/devil_sound.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/devil_sound.mp3
+
+#begin SFX/goblin_death.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/goblin_death.mp3
+
+#begin SFX/goblin_idle.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/goblin_idle.mp3
+
