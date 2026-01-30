@@ -47,8 +47,11 @@ namespace EternalJourney
             // Map 3: bg_4 (Goblin)
             _tracks[3] = content.Load<SoundEffect>("SFX/bg_4");
             
-            // Map 4: bg_1 (Şeytan/Final)
+            // Map 4: bg_1 (Şeytan/Final) - Şimdilik Skeleton Map
             _tracks[4] = content.Load<SoundEffect>("SFX/bg_1");
+            
+            // Map 5: bg_1 (Şeytan/Final) - Final Map
+            _tracks[5] = content.Load<SoundEffect>("SFX/bg_1");
         }
 
         public void PlayMusicForMap(int mapIndex)

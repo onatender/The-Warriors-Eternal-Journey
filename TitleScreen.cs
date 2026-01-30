@@ -2,6 +2,7 @@ using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Audio;
 
 namespace EternalJourney;
 
@@ -23,6 +24,18 @@ public class TitleScreen
     public bool IsNameInputActive { get; private set; } = false;
     private int _targetSlotForNewGame = -1;
     private string _newPlayerName = "";
+    
+    // Volume Control
+    private Rectangle _volumeBarRect;
+    private Rectangle _volumeKnobRect;
+    private bool _isDraggingVolume = false;
+    private float _currentVolume = 1.0f;
+    
+    // Buttons (New Game Modal)
+    private Rectangle _btnStartRect;
+    private Rectangle _btnCancelRect;
+    private bool _hoverStart = false;
+    private bool _hoverCancel = false;
     
     // Events
     public event Action<int, string> OnGameStart; // slotIndex, playerName (if new)
@@ -52,7 +65,21 @@ public class TitleScreen
             _slotRects[i] = new Rectangle(centerX, startY + i * (slotHeight + 20), slotWidth, slotHeight);
         }
         
+        // Volume Slider (Bottom Right)
+        _volumeBarRect = new Rectangle(screenWidth - 170, screenHeight - 40, 150, 10);
+        UpdateVolumeKnob();
+        
+        // Init Sound Volume
+        try { _currentVolume = SoundEffect.MasterVolume; } catch { _currentVolume = 1.0f; }
+        UpdateVolumeKnob();
+        
         RefreshSlots();
+    }
+    
+    private void UpdateVolumeKnob()
+    {
+        int knobX = _volumeBarRect.X + (int)(_volumeBarRect.Width * _currentVolume) - 5;
+        _volumeKnobRect = new Rectangle(knobX, _volumeBarRect.Y - 5, 10, 20);
     }
     
     public void RefreshSlots()
@@ -62,23 +89,71 @@ public class TitleScreen
     
     public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
     {
+        Point mousePos = mouseState.Position;
+        
+        // --- VOLUME CONTROL ---
+        // Drag start
+        if (mouseState.LeftButton == ButtonState.Pressed && _previousMouseState.LeftButton == ButtonState.Released)
+        {
+            if (_volumeKnobRect.Contains(mousePos) || _volumeBarRect.Contains(mousePos))
+            {
+                _isDraggingVolume = true;
+            }
+        }
+        
+        // Dragging
+        if (_isDraggingVolume && mouseState.LeftButton == ButtonState.Pressed)
+        {
+            float relativeX = mousePos.X - _volumeBarRect.X;
+            _currentVolume = MathHelper.Clamp(relativeX / _volumeBarRect.Width, 0f, 1f);
+            
+            try { SoundEffect.MasterVolume = _currentVolume; } catch {}
+            UpdateVolumeKnob();
+        }
+        
+        // Drag End
+        if (mouseState.LeftButton == ButtonState.Released)
+        {
+            _isDraggingVolume = false;
+        }
+    
         if (IsNameInputActive)
         {
             HandleNameInput(keyboardState);
+            
+            // Mouse for Modal Buttons
+            _hoverStart = _btnStartRect.Contains(mousePos);
+            _hoverCancel = _btnCancelRect.Contains(mousePos);
+            
+            if (mouseState.LeftButton == ButtonState.Pressed && _previousMouseState.LeftButton == ButtonState.Released)
+            {
+                if (_hoverStart && !string.IsNullOrWhiteSpace(_newPlayerName))
+                {
+                    OnGameStart?.Invoke(_targetSlotForNewGame, _newPlayerName);
+                    IsNameInputActive = false;
+                }
+                else if (_hoverCancel)
+                {
+                    IsNameInputActive = false;
+                    _targetSlotForNewGame = -1;
+                }
+            }
+            
             _previousKeyState = keyboardState;
+            _previousMouseState = mouseState; // IMPORTANT to update prev state here too if returning early
             return;
         }
         
-        // Mouse Hover
+        // Mouse Hover Slots
         _hoveredSlot = -1;
         for (int i = 0; i < 3; i++)
         {
-            if (_slotRects[i].Contains(mouseState.Position))
+            if (_slotRects[i].Contains(mousePos))
             {
                 _hoveredSlot = i;
                 
                 // Click
-                if (mouseState.LeftButton == ButtonState.Pressed && _previousMouseState.LeftButton == ButtonState.Released)
+                if (mouseState.LeftButton == ButtonState.Pressed && _previousMouseState.LeftButton == ButtonState.Released && !_isDraggingVolume)
                 {
                     OnSlotClicked(i);
                 }
@@ -104,12 +179,26 @@ public class TitleScreen
             _targetSlotForNewGame = slotIndex;
             _newPlayerName = "";
             IsNameInputActive = true;
+            
+            // Initialize Modal Button Rects (Centered relative to screen)
+            int boxW = 400; int boxH = 200;
+            Rectangle boxRect = new Rectangle((_screenWidth - boxW)/2, (_screenHeight - boxH)/2, boxW, boxH);
+            
+            // Buttons at bottom of modal
+            int btnW = 100; int btnH = 30;
+            int spacing = 20;
+            int startX = boxRect.Center.X - btnW - spacing/2;
+            int cancelX = boxRect.Center.X + spacing/2;
+            int btnY = boxRect.Bottom - 45;
+            
+            _btnStartRect = new Rectangle(startX, btnY, btnW, btnH);
+            _btnCancelRect = new Rectangle(cancelX, btnY, btnW, btnH);
         }
     }
     
     private void HandleNameInput(KeyboardState currentKey)
     {
-        // Simple text input helper would be better, but implementing basic here
+        // Simple text input helper
         Keys[] pressedKeys = currentKey.GetPressedKeys();
         
         foreach (Keys key in pressedKeys)
@@ -219,12 +308,34 @@ public class TitleScreen
             // Name
             string display = _newPlayerName + "_";
             Vector2 nSize = font.MeasureString(display);
-            spriteBatch.DrawString(font, display, new Vector2(boxRect.X + (boxW-nSize.X)/2, boxRect.Y + 90), Color.White);
+            spriteBatch.DrawString(font, display, new Vector2(boxRect.X + (boxW-nSize.X)/2, boxRect.Y + 80), Color.White);
             
-            // Hint
-            string hitT = "[ENTER] Start  [ESC] Cancel";
-            Vector2 hSize = font.MeasureString(hitT) * 0.7f;
-            spriteBatch.DrawString(font, hitT, new Vector2(boxRect.X + (boxW-hSize.X)/2, boxRect.Y + 150), Color.Gray, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
+            // Buttons
+            Color startColor = _hoverStart ? Color.Lime : new Color(0, 100, 0);
+            Color cancelColor = _hoverCancel ? Color.Red : new Color(100, 0, 0);
+            
+            // Start Btn
+            spriteBatch.Draw(_panelTexture, _btnStartRect, startColor);
+            string startTxt = "BASLA";
+            Vector2 sSz = font.MeasureString(startTxt);
+            spriteBatch.DrawString(font, startTxt, new Vector2(_btnStartRect.Center.X - sSz.X/2, _btnStartRect.Center.Y - sSz.Y/2), Color.White);
+            
+            // Cancel Btn
+            spriteBatch.Draw(_panelTexture, _btnCancelRect, cancelColor);
+            string cancelTxt = "IPTAL";
+            Vector2 cSz = font.MeasureString(cancelTxt);
+            spriteBatch.DrawString(font, cancelTxt, new Vector2(_btnCancelRect.Center.X - cSz.X/2, _btnCancelRect.Center.Y - cSz.Y/2), Color.White);
         }
+        
+        // DRAW VOLUME SLIDER
+        // Label
+        spriteBatch.DrawString(font, "SES:", new Vector2(_volumeBarRect.X - 40, _volumeBarRect.Y - 5), Color.Gray);
+        // Bar
+        spriteBatch.Draw(_panelTexture, _volumeBarRect, Color.DarkGray);
+        // Fill
+        Rectangle fillRect = new Rectangle(_volumeBarRect.X, _volumeBarRect.Y, (int)(_volumeBarRect.Width * _currentVolume), _volumeBarRect.Height);
+        spriteBatch.Draw(_panelTexture, fillRect, Color.Lime);
+        // Knob
+        spriteBatch.Draw(_panelTexture, _volumeKnobRect, Color.White);
     }
 }

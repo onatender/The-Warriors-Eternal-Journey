@@ -10,7 +10,8 @@ public enum EnemyType
 {
     Demon,  // Güçlü, Tridentli
     Goblin,  // Zayıf, Hızlı
-    Spider  // Orta, Hızlı
+    Spider,  // Orta, Hızlı
+    Skeleton // Yeni: Sprite Animasyonlu
 }
 
 public enum EnemyState
@@ -80,8 +81,27 @@ public class Enemy
     public static SoundEffect SfxDemonIdle;
     public static SoundEffect SfxGoblinIdle;
     public static SoundEffect SfxGoblinDeath;
+    // Skeleton Assets
+    public static Texture2D TexSkeletonIdle;
+    public static Texture2D TexSkeletonWalk;
+    public static Texture2D TexSkeletonAttack;
+    public static Texture2D TexSkeletonDeath;
+    public static Texture2D TexSkeletonHit;
+    public static Texture2D TexSkeletonShield;
     
-
+    public static void LoadSkeletonContent(GraphicsDevice gd)
+    {
+        try {
+            using (var stream = System.IO.File.OpenRead("Content/Skeleton/Idle.png")) TexSkeletonIdle = Texture2D.FromStream(gd, stream);
+            using (var stream = System.IO.File.OpenRead("Content/Skeleton/Walk.png")) TexSkeletonWalk = Texture2D.FromStream(gd, stream);
+            using (var stream = System.IO.File.OpenRead("Content/Skeleton/Attack.png")) TexSkeletonAttack = Texture2D.FromStream(gd, stream);
+            using (var stream = System.IO.File.OpenRead("Content/Skeleton/Death.png")) TexSkeletonDeath = Texture2D.FromStream(gd, stream);
+            using (var stream = System.IO.File.OpenRead("Content/Skeleton/Take Hit.png")) TexSkeletonHit = Texture2D.FromStream(gd, stream);
+            using (var stream = System.IO.File.OpenRead("Content/Skeleton/Shield.png")) TexSkeletonShield = Texture2D.FromStream(gd, stream);
+        } catch (Exception e) {
+            System.Diagnostics.Debug.WriteLine("Skeleton texture load error: " + e.Message);
+        }
+    }
     
     // Global ses kontrolü (idle sesleri için)
     private static float _globalIdleSoundTimer = 0f;
@@ -146,7 +166,7 @@ public class Enemy
             _attackRadius = 45f;
             _attackCooldown = 1.2f;
         }
-        else // Goblin
+        else if (Type == EnemyType.Goblin)
         {
             // Goblin - Zayıf ve Hızlı
             _width = 32;
@@ -159,6 +179,21 @@ public class Enemy
             _aggroRadius = 180f;
             _attackRadius = 40f;
             _attackCooldown = 1.0f; // Hızlı saldırı
+        }
+        else if (Type == EnemyType.Skeleton)
+        {
+            // Skeleton - Yüksek hasar
+            // Hitbox boyutları (Sprite çizimi 150px olabilir ama fiziksel boyut küçük)
+            _width = 50; 
+            _height = 80;
+            MaxHealth = 200;
+            CurrentHealth = MaxHealth;
+            MinDamage = 10;
+            MaxDamage = 20;
+            _speed = 90f; // Yavaş ama tehlikeli
+            _aggroRadius = 220f;
+            _attackRadius = 70f; // Silah menzili
+            _attackCooldown = 1.8f;
         }
     }
     
@@ -628,6 +663,8 @@ public class Enemy
         OnAttackPlayer?.Invoke(damage);
     }
     
+    private double _deathTime = 0;
+
     public void TakeDamage(int damage)
     {
         if (IsDead) return;
@@ -639,6 +676,8 @@ public class Enemy
         if (CurrentHealth <= 0) 
         {
             CurrentHealth = 0;
+            _deathTime = Game1.TotalTime;
+            
             // Death Sound
             if (Type == EnemyType.Goblin && SfxGoblinDeath != null)
             {
@@ -661,7 +700,15 @@ public class Enemy
 
     public void Draw(SpriteBatch spriteBatch)
     {
-        if (IsDead) return; // Ölüleri ÇİZME!
+        // Ölüleri normalde çizme, ama Skeletonun animasyonu var
+        if (IsDead && Type != EnemyType.Skeleton) return; 
+        
+        // Skeleton öldükten bir süre sonra (ceset kaybolsun mu? Şimdilik kalsın veya yavaşça sönsün)
+        if (IsDead && Type == EnemyType.Skeleton)
+        {
+            float timeDead = (float)(Game1.TotalTime - _deathTime);
+            if (timeDead > 5.0f) return; // 5 saniye sonra çizme
+        }
         
         float offsetY = MathF.Sin(_animationTimer) * 2f;
         Vector2 drawPos = new Vector2(Position.X - _width / 2, Position.Y - _height / 2 + offsetY);
@@ -681,6 +728,13 @@ public class Enemy
         
         Color tint = _showDamageFlash ? Color.Red : Color.White;
         SpriteEffects flip = _facingDirection == -1 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+        
+        if (Type == EnemyType.Skeleton)
+        {
+             // Position (Merkez) gönderiyoruz, çünkü DrawSkeleton origin'i merkeze ayarlıyor
+             DrawSkeleton(spriteBatch, Position, flip);
+             return; 
+        }
         
         spriteBatch.Draw(_texture, drawPos, null, tint, 0f, Vector2.Zero, 1f, flip, 0f);
         
@@ -704,6 +758,82 @@ public class Enemy
         Vector2 origin = new Vector2(_weaponTexture.Width / 2, _weaponTexture.Height - 5);
         
         spriteBatch.Draw(_weaponTexture, weaponPos, null, Color.White, baseRotation + attackRotation, origin, 1f, flip, 0f);
+    }
+
+    public void DrawSkeleton(SpriteBatch spriteBatch, Vector2 position, SpriteEffects flip)
+    {
+        Texture2D textureToDraw = TexSkeletonIdle;
+        int frameCount = 4; // Varsayılan 4 frame
+        
+        // State'e göre texture seçimi
+        if (IsDead) 
+        {
+            textureToDraw = TexSkeletonDeath;
+            frameCount = 4; // Texture boyutuna göre değişebilir ama 4 varsayalım
+        }
+        else if (_isAttacking) 
+        {
+            textureToDraw = TexSkeletonAttack;
+            frameCount = 8;
+        }
+        else if (State == EnemyState.Chasing || State == EnemyState.Returning || _isWalkingToTarget) 
+        {
+            textureToDraw = TexSkeletonWalk;
+            frameCount = 4;
+        }
+        else if (_showDamageFlash)
+        {
+            textureToDraw = TexSkeletonHit;
+            frameCount = 4;
+        }
+        
+        if (textureToDraw == null) return;
+        
+        // Frame Hesabı
+        int frameWidth = textureToDraw.Width / frameCount;
+        // int frameHeight = 150; // Unused 
+        
+        // Eğer texture çok büyükse (örn. birden fazla satır varsa) sadece ilk satırı (150px) alıyoruz
+        if (frameWidth > 150) frameWidth = 150; 
+        
+        // Animasyon hızı frame sayısına göre
+        float speed = 8f; // 8 fps
+        int currentFrame = (int)(Game1.TotalTime * speed) % frameCount;
+        
+        // Eğer saldırıyorsa özel timer kullan
+        if (_isAttacking)
+        {
+            float n = _attackAnimTimer / MathF.PI; // 0 to 1
+            if (n > 1) n = 1;
+            currentFrame = (int)(n * (frameCount - 1));
+        }
+        else if (IsDead)
+        {
+            // Ölüm animasyonu: Oynat ve son karede dur
+            float timeDead = (float)(Game1.TotalTime - _deathTime);
+            currentFrame = (int)(timeDead * 8f); // 8 FPS hızında oynat
+            if (currentFrame >= frameCount) currentFrame = frameCount - 1;
+        }
+        
+        // CROP: Ghost leg ve artifactleri temizlemek için source rect'i daraltıyoruz
+        // Sol sağdan 20px, alttan 30px (eğer 150 yükseklikse 120'ye düşür)
+        int cleanWidth = frameWidth - 40; 
+        int cleanHeight = 120; // 150px içinde sadece üst 120px'i al
+        
+        // Source rect'i ortadan al
+        Rectangle sourceRect = new Rectangle(
+            currentFrame * frameWidth + 20, // Soldan 20px içerden başla
+            0, // Üstten başla
+            cleanWidth, 
+            cleanHeight
+        );
+        
+        // Origin'i yeni boyutlara göre ayarla
+        Vector2 origin = new Vector2(cleanWidth / 2f, cleanHeight / 2f); 
+        
+        Color tint = _showDamageFlash ? Color.Red : Color.White;
+        
+        spriteBatch.Draw(textureToDraw, position + new Vector2(0, 5), sourceRect, tint, 0f, origin, 1.5f, flip, 0f);
     }
 
     public float GetHealthPercent() => (float)CurrentHealth / MaxHealth;

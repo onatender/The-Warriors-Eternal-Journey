@@ -55,7 +55,7 @@ public partial class Game1 : Game
 
     // Harita Sistemi
     private int _currentMapIndex = 1;
-    private const int MAX_MAPS = 4;
+    private const int MAX_MAPS = 5;
     
     // Ölüm Sistemi
     private bool _playerNeedsRespawn = false;
@@ -101,8 +101,8 @@ public partial class Game1 : Game
     private SoundEffect _sfxCoinSell;
     private SoundEffect _sfxCoinDrop;
     
-    // Mobile UI
-    private VirtualJoystick _joystick;
+    // Mobile UI (Removed Joystick)
+    // private VirtualJoystick _joystick;
     private Rectangle _statsButtonRect;
     private bool _isHoveringStats;
     private Texture2D _statsIconTexture;
@@ -522,7 +522,7 @@ public partial class Game1 : Game
             _graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight);
             
         // Mobile UI Init
-        _joystick = new VirtualJoystick(GraphicsDevice, new Vector2(150, _graphics.PreferredBackBufferHeight - 150), 80);
+        // _joystick = new VirtualJoystick(GraphicsDevice, new Vector2(150, _graphics.PreferredBackBufferHeight - 150), 80);
         _statsButtonRect = new Rectangle(_graphics.PreferredBackBufferWidth - 100, _graphics.PreferredBackBufferHeight - 180, 64, 64);
         _statsIconTexture = CreateStatsIcon(GraphicsDevice, 64);
             
@@ -539,6 +539,9 @@ public partial class Game1 : Game
         Enemy.SfxDemonIdle = Content.Load<SoundEffect>("SFX/devil_sound");
         Enemy.SfxGoblinIdle = Content.Load<SoundEffect>("SFX/goblin_idle");
         Enemy.SfxGoblinDeath = Content.Load<SoundEffect>("SFX/goblin_death");
+        
+        // Load Skeleton Assets (Raw PNGs)
+        Enemy.LoadSkeletonContent(GraphicsDevice);
         
         // Player SFX
         Player.SfxCoinPickup = _sfxCoinPickup;
@@ -679,7 +682,17 @@ public partial class Game1 : Game
         }
         else if (mapIndex == 4)
         {
-            // --- MAP 4: DEMON HALL --- (Zor)
+            // --- MAP 4: SKELETON DUNGEON --- (Zorlu)
+            for (int i = 0; i < 7; i++)
+            {
+                int x = rnd.Next(safeMargin, MAP_WIDTH - safeMargin);
+                int y = rnd.Next(safeMargin, MAP_HEIGHT - safeMargin);
+                _enemyManager.SpawnGroup(new Vector2(x, y), EnemyType.Skeleton, 3);
+            }
+        }
+        else if (mapIndex == 5)
+        {
+            // --- MAP 5: DEMON HALL --- (Final)
             for (int i = 0; i < 5; i++)
             {
                 int x = rnd.Next(safeMargin, MAP_WIDTH - safeMargin);
@@ -870,7 +883,7 @@ public partial class Game1 : Game
         _camera.Update(_player.Center);
         
         // --- MOBILE UI UPDATE ---
-        _joystick.Update(currentMouseState, _previousMouseState);
+        // _joystick.Update(currentMouseState, _previousMouseState);
         _isHoveringStats = _statsButtonRect.Contains(currentMouseState.Position);
         if (_isHoveringStats && currentMouseState.LeftButton == ButtonState.Pressed && _previousMouseState.LeftButton == ButtonState.Released)
         {
@@ -883,8 +896,8 @@ public partial class Game1 : Game
             }
         }
         
-        // Player update with joystick
-        _player.Update(gameTime, MAP_WIDTH, MAP_HEIGHT, _enemyManager, _joystick.InputDirection);
+        // Player update
+        _player.Update(gameTime, MAP_WIDTH, MAP_HEIGHT, _enemyManager, Vector2.Zero);
         _player.UpdateCombat(gameTime, _enemyManager);
         _enemyManager.Update(gameTime, _player.Center, _player.Bounds);
         
@@ -969,7 +982,7 @@ public partial class Game1 : Game
     {
         GraphicsDevice.Clear(Color.Black);
 
-        // --- 1. WORLD SPACE (Kamera Transformu ile) ---
+        // --- 1. WORLD SPACE - BACKGROUND (Wrap) ---
         _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointWrap, null, null, null, _camera.GetViewMatrix());
         
         // --- ARKA PLAN ÇİZİMİ ---
@@ -978,15 +991,16 @@ public partial class Game1 : Game
             Rectangle mapRect = new Rectangle(0, 0, MAP_WIDTH, MAP_HEIGHT);
             _spriteBatch.Draw(_backgroundTexture, Vector2.Zero, mapRect, Color.White);
         }
+        
+        _spriteBatch.End();
+
+        // --- 2. WORLD SPACE - ENTITIES (Clamp) ---
+        // Clamp kullanarak sprite kenarlarındaki taşmaları (artifact/bleeding) engelliyoruz
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, null, _camera.GetViewMatrix());
 
         if (_currentState == GameState.Login)
         {
-            // Login textleri aslında UI Layer'da olmalı ama burada da kalabilir, 
-            // fakat kamera transformundan etkilensin istemiyorsak UI batch'e taşımalıyız.
-            // Ama login ekranında kamera 0,0'da olacağı için sorun olmaz.
-            // Yine de title UI logic.
-            
-            // Biz Login'i UI batch'e taşıyalım, burada sadece entities çizilsin.
+            // Login logic handled in UI layer mostly
         }
         else
         {
@@ -1033,7 +1047,7 @@ public partial class Game1 : Game
             _inventory.Draw(_spriteBatch, _gameFont);
             
             // Mobile UI Draw
-            _joystick.Draw(_spriteBatch);
+            // _joystick.Draw(_spriteBatch);
             _spriteBatch.Draw(_statsIconTexture, _statsButtonRect, _isHoveringStats ? Color.White : new Color(200, 200, 200, 200));
             
             // Eğer Enhancement Mode'daysa bilgi yaz
@@ -1195,7 +1209,8 @@ public partial class Game1 : Game
         if (_currentMapIndex == 1) mapText += " (Guvenli)";
         else if (_currentMapIndex == 2) mapText += " (Goblin)";
         else if (_currentMapIndex == 3) mapText += " (Orumcek)";
-        else if (_currentMapIndex == 4) mapText += " (Seytan)";
+        else if (_currentMapIndex == 4) mapText += " (Iskelet)";
+        else if (_currentMapIndex == 5) mapText += " (Seytan)";
         
         Vector2 mapSize = _gameFont.MeasureString(mapText);
         _spriteBatch.DrawString(_gameFont, mapText, 
@@ -1330,7 +1345,14 @@ public partial class Game1 : Game
         }
         else if (mapIndex == 4)
         {
-            // Map 4: Demon (Alevli/Kırmızı)
+            // Map 4: Skeleton (Gri/Kemik Rengi)
+            baseColor = new Color(50, 50, 55);
+            jointColor = new Color(30, 30, 35);
+            highlightColor = new Color(70, 70, 75);
+        }
+        else if (mapIndex == 5)
+        {
+            // Map 5: Demon (Alevli/Kırmızı)
             baseColor = new Color(50, 20, 15);
             jointColor = new Color(30, 10, 5);
             highlightColor = new Color(70, 30, 25);

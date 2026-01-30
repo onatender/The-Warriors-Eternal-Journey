@@ -54,33 +54,41 @@ public static class LootManager
     public static void Initialize()
     {
         // Goblin Drop Havuzu
+        // Goblin Drop Havuzu (Başlangıç)
         LootTable goblinLoot = new LootTable();
-        goblinLoot.AddItem(99, 2.0); // %2 ihtimalle Güçlendirme Taşı
-        goblinLoot.AddItem(20, 1.0); // %1 Şans Tılsımı %10
-        goblinLoot.AddItem(21, 0.5); // %0.5 Şans Tılsımı %25
-        goblinLoot.AddItem(30, 2.0); // %2 Muska
-        goblinLoot.AddItem(40, 3.0); // %3 Tahta Kalkan (YENİ)
-        goblinLoot.AddItem(25, 2.0); // %2 Can İksiri
+        goblinLoot.AddItem(25, 4.0); // %4 Can İksiri
+        goblinLoot.AddItem(40, 2.0); // %2 Tahta Kalkan
+        goblinLoot.AddItem(20, 2.0); // %2 Şans Tılsımı %10
+        goblinLoot.AddItem(99, 1.0); // %1 Güçlendirme Taşı
         _lootTables[EnemyType.Goblin] = goblinLoot;
 
-        // Spider Drop Havuzu (YENİ)
+        // Spider Drop Havuzu (Seviye 2)
         LootTable spiderLoot = new LootTable();
         spiderLoot.AddItem(99, 3.0); // %3 Güçlendirme Taşı
-        spiderLoot.AddItem(50, 4.0); // %4 Deri Kask
-        spiderLoot.AddItem(40, 2.0); // %2 Tahta Kalkan
-        spiderLoot.AddItem(20, 1.5); // %1.5 Şans Tılsımı %10
-        spiderLoot.AddItem(25, 2.0); // %2 Can İksiri
+        spiderLoot.AddItem(50, 2.5); // %2.5 Deri Kask
+        spiderLoot.AddItem(40, 1.5); // %1.5 Tahta Kalkan
+        spiderLoot.AddItem(20, 3.0); // %3 Şans Tılsımı %10
+        spiderLoot.AddItem(25, 3.0); // %3 Can İksiri
         _lootTables[EnemyType.Spider] = spiderLoot;
+        
+        // Skeleton Drop Havuzu (Seviye 3 - Yeni)
+        LootTable skeletonLoot = new LootTable();
+        skeletonLoot.AddItem(41, 2.0); // %2 Demir Kalkan (İyi drop)
+        skeletonLoot.AddItem(99, 5.0); // %5 Güçlendirme Taşı
+        skeletonLoot.AddItem(21, 1.5); // %1.5 Şans Tılsımı %25
+        skeletonLoot.AddItem(30, 0.5); // %0.5 Muska
+        skeletonLoot.AddItem(25, 2.0); // %2 Can İksiri
+        _lootTables[EnemyType.Skeleton] = skeletonLoot;
 
-        // Demon Drop Havuzu
+        // Demon Drop Havuzu (Seviye 4 - Final)
         LootTable demonLoot = new LootTable();
-        demonLoot.AddItem(3, 5.0); // %5 ihtimalle Deri Zırh
-        demonLoot.AddItem(99, 4.0); // %4 Güçlendirme Taşı
-        demonLoot.AddItem(22, 0.25); // %0.25 Şans Tılsımı %50
-        demonLoot.AddItem(31, 0.2); // %0.2 Büyülü Muska
-        demonLoot.AddItem(41, 1.5); // %1.5 Demir Kalkan (YENİ)
-        demonLoot.AddItem(51, 1.5); // %1.5 Demir Kask (YENİ)
-        demonLoot.AddItem(25, 2.0); // %2 Can İksiri
+        demonLoot.AddItem(51, 2.0); // %2 Demir Kask
+        demonLoot.AddItem(41, 1.5); // %1.5 Demir Kalkan
+        demonLoot.AddItem(99, 8.0); // %8 Güçlendirme Taşı
+        demonLoot.AddItem(22, 1.0); // %1 Şans Tılsımı %50
+        demonLoot.AddItem(31, 0.5); // %0.5 Büyülü Muska
+        demonLoot.AddItem(3, 1.0);  // %1 Deri Zırh (Nadir)
+        demonLoot.AddItem(25, 3.0); // %3 Can İksiri
         _lootTables[EnemyType.Demon] = demonLoot;
     }
 

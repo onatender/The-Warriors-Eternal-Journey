@@ -159,10 +159,10 @@ public class Player
     
     public static SoundEffect SfxCoinPickup;
     
-    public void GainGold(int amount)
+    public void GainGold(int amount, bool silent = false)
     {
         Gold += amount;
-        SfxCoinPickup?.Play();
+        if (!silent && amount > 0) SfxCoinPickup?.Play();
     }
     
     public void LoseGold(int amount)

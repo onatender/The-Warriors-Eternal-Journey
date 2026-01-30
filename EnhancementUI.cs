@@ -229,7 +229,7 @@ public class EnhancementUI
         }
         
         // Harcama yap (Taş ve Altın)
-        _player.GainGold(-_costGold);
+        _player.GainGold(-_costGold, true); // Silent: true (Ses çıkmasın)
         _inventory.RemoveItem(99, _costStones); 
         
         // Şans Hesapla
@@ -251,7 +251,7 @@ public class EnhancementUI
             // BAŞARILI
             _targetItem.UpgradeSuccess();
             _resultMessage = "YUKSELTME BASARILI!";
-            _resultColor = Color.Gold;
+            _resultColor = Color.LightGreen; // Gold yerine açık yeşil daha okunur olabilir veya Gold kalsın ama arka plan ekleyeceğiz
             
             CreateParticles(_windowBounds.Center.ToVector2(), Color.Gold, 50);
             CreateParticles(_windowBounds.Center.ToVector2(), Color.Cyan, 30);
@@ -335,7 +335,7 @@ public class EnhancementUI
             {
                 Close(); // Eşya gitti, kapat
             }
-            else if (_resultColor == Color.Gold)
+            else if (_resultColor == Color.LightGreen || _resultColor == Color.Gold) // Başarılı
             {
                  Close(); // Başarılı, kapat (sonucu görsünler diye beklettik zaten)
                  OnUpgradeCompleted?.Invoke();
@@ -459,6 +459,14 @@ public class EnhancementUI
             Vector2 msgSz = font.MeasureString(_resultMessage);
             Vector2 center = new Vector2(_windowBounds.Center.X, _windowBounds.Center.Y);
             Vector2 origin = msgSz / 2;
+            
+            // Arka plan kutusu (Yazının okunması için)
+            // rectangle width = msgSz.X * scale + 20
+            int bgW = (int)(msgSz.X * scale + 40);
+            int bgH = (int)(msgSz.Y * scale + 20);
+            Rectangle bgRect = new Rectangle((int)center.X - bgW/2, (int)center.Y - bgH/2, bgW, bgH);
+            spriteBatch.Draw(_pixelTexture, bgRect, new Color(0, 0, 0, 180));
+            
             spriteBatch.DrawString(font, _resultMessage, center + new Vector2(2, 2), Color.Black * 0.5f, 0f, origin, scale, SpriteEffects.None, 0f);
             spriteBatch.DrawString(font, _resultMessage, center, _resultColor, 0f, origin, scale, SpriteEffects.None, 0f);
         }

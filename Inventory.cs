@@ -94,7 +94,7 @@ public class Inventory
     // Seçili item (taşıma için)
     private InventorySlot _selectedSlot = null;
     private bool _isFromEquipment = false;
-    private int _selectedEquipIndex = -1;
+    // private int _selectedEquipIndex = -1; // Unused
     private Point _selectedGridPos = new Point(-1, -1);
     
     // Sayfa butonları
@@ -580,21 +580,27 @@ public class Inventory
             _hoveringPrev = _prevPageButton.Contains(mousePos);
             _hoveringNext = _nextPageButton.Contains(mousePos);
             
-            // Mouse tıklama
-            if (currentMouseState.LeftButton == ButtonState.Pressed && 
-                _previousMouseState.LeftButton == ButtonState.Released)
-            {
-                HandleLeftClick(mousePos);
-            }
-            
-            // Sağ tık - eşya giy/çıkar
-            if (currentMouseState.RightButton == ButtonState.Pressed && 
-                _previousMouseState.RightButton == ButtonState.Released)
-            {
-                HandleRightClick(mousePos);
-            }
-            
-            // Sayfa değiştirme - klavye
+        // Mouse tıklama (Basıldı)
+        if (currentMouseState.LeftButton == ButtonState.Pressed && 
+            _previousMouseState.LeftButton == ButtonState.Released)
+        {
+            HandleLeftClick(mousePos);
+        }
+        // Mouse bırakma (Released) - Drag bitir
+        else if (currentMouseState.LeftButton == ButtonState.Released && 
+                 _previousMouseState.LeftButton == ButtonState.Pressed)
+        {
+            if (_isDragging) EndDrag(mousePos);
+        }
+        
+        // Sağ tık - eşya giy/çıkar
+        if (currentMouseState.RightButton == ButtonState.Pressed && 
+            _previousMouseState.RightButton == ButtonState.Released)
+        {
+            HandleRightClick(mousePos);
+        }
+        
+        // Sayfa değiştirme - klavye
             if (currentKeyState.IsKeyDown(Keys.Left) && !_previousKeyState.IsKeyDown(Keys.Left) && _currentPage > 0)
             {
                 _currentPage--;
@@ -609,6 +615,13 @@ public class Inventory
         _previousMouseState = currentMouseState;
     }
     
+    // Drag & Drop
+    private bool _isDragging = false;
+    private InventorySlot _dragSourceSlot = null; // Nereden aldık?
+    private Item _dragItem = null; // Ne taşıyoruz?
+    private bool _dragFromEquip = false; // Ekipmandan mı?
+    private int _dragEquipIndex = -1; 
+    
     private void HandleLeftClick(Point mousePos)
     {
         // Sayfa butonları
@@ -622,19 +635,21 @@ public class Inventory
             _currentPage++;
             return;
         }
-        
-        // Enhancement Mode Kontrolü
-        if (IsEnhancementMode)
+
+        // --- DRAG START ---
+        // Eğer hiçbir şey taşımıyorsak, tıklanan yerdeki itemi al
+        if (!_isDragging)
         {
-            Item targetItem = null;
-            
             // Grid slotu mu?
             if (_hoveredSlot.X >= 0)
             {
                 var slot = _slots[_currentPage, _hoveredSlot.Y, _hoveredSlot.X];
-                if (!slot.IsEmpty) targetItem = slot.Item;
+                if (!slot.IsEmpty)
+                {
+                    BeginDrag(slot, false, -1);
+                }
             }
-            // Ekipman slotu mu?
+            // Equipment slotu mu?
             else if (_hoveredEquipSlot >= 0)
             {
                 InventorySlot slot = _hoveredEquipSlot switch
@@ -645,104 +660,224 @@ public class Inventory
                     3 => HelmetSlot,
                     _ => null
                 };
-                if (slot != null && !slot.IsEmpty) targetItem = slot.Item;
+                if (slot != null && !slot.IsEmpty)
+                {
+                    BeginDrag(slot, true, _hoveredEquipSlot);
+                }
             }
+        }
+    }
+    
+    private void BeginDrag(InventorySlot source, bool isEquip, int equipIndex)
+    {
+        _isDragging = true;
+        _dragSourceSlot = source;
+        _dragItem = source.Item;
+        _dragFromEquip = isEquip;
+        _dragEquipIndex = equipIndex;
+        
+        // Slotu görsel olarak boşaltmıyoruz, referans kalsın ama çizimde drag item'ı ayrıca çizeceğiz
+        // Ancak genellikle inventory mantığında, drag edilen item slottan 'kalkar'.
+        // Basitlik için: Slot'u geçici olarak boşaltalım, drop olmazsa geri koyarız.
+        // Veya slotta dursun, ama şeffaf çizilsin? -> Slot boşalsın daha iyi.
+        source.Item = null; // Itemı elimize aldık
+        // Quantity? Eğer stackable ise hepsi gelir.
+    }
+    
+    private void EndDrag(Point mousePos)
+    {
+        if (!_isDragging) return;
+        
+        bool handled = false;
+        
+        // Mouse nerede bırakıldı?
+        
+        // 1. Grid Slot Üzerine Bırakıldı
+        if (_hoveredSlot.X >= 0)
+        {
+            var targetSlot = _slots[_currentPage, _hoveredSlot.Y, _hoveredSlot.X];
             
-            // Eğer geçerli bir hedefse tetikle
-            if (targetItem != null && (targetItem.Type == ItemType.Weapon || targetItem.Type == ItemType.Armor || targetItem.Type == ItemType.Shield || targetItem.Type == ItemType.Helmet))
+            // --- ENHANCEMENT STONE LOGIC (GRID) ---
+            if (_dragItem.Id == 99 && !targetSlot.IsEmpty)
             {
-                OnEnhancementTargetSelected?.Invoke(targetItem);
-                IsEnhancementMode = false; // Modu kapat
+               // Eğer hedef item geliştirilebilir bir eşya ise
+               if (targetSlot.Item.Type == ItemType.Weapon || 
+                   targetSlot.Item.Type == ItemType.Armor || 
+                   targetSlot.Item.Type == ItemType.Shield || 
+                   targetSlot.Item.Type == ItemType.Helmet)
+               {
+                   OnEnhancementTargetSelected?.Invoke(targetSlot.Item);
+                   CancelDrag();
+                   return;
+               }
+            }
+            // -------------------------------------
+            
+            // Hedef boş mu?
+            if (targetSlot.IsEmpty)
+            {
+                // Direkt koy
+                targetSlot.Item = _dragItem;
+                targetSlot.Quantity = _dragSourceSlot.Quantity; 
+                if (targetSlot != _dragSourceSlot) _dragSourceSlot.Quantity = 0; // BUG FIX: Don't zero if self-drop
+                
+                // Eğer ekipmandan geldiyse event fırlat (çıkartıldı)
+                if (_dragFromEquip) FireEquipEvent(_dragEquipIndex, null);
+                
+                handled = true;
+            }
+            else
+            {
+                // Dolu, yer değiştir (Swap) veya Stackle
+                
+                // Stackleme Logic
+                if (targetSlot.Item.Id == _dragItem.Id && 
+                   (targetSlot.Item.Type == ItemType.Material || targetSlot.Item.Type == ItemType.Consumable) &&
+                   targetSlot.Item.EnhancementLevel == 0)
+                {
+                    targetSlot.Quantity += _dragSourceSlot.Quantity;
+                    if (targetSlot != _dragSourceSlot) _dragSourceSlot.Quantity = 0; // BUG FIX
+                    
+                    if (_dragFromEquip) FireEquipEvent(_dragEquipIndex, null);
+                    handled = true;
+                }
+                else
+                {
+                    // Swap Logic
+                    Item temp = targetSlot.Item;
+                    int tempQty = targetSlot.Quantity;
+                    
+                    bool canSwap = true;
+                    
+                    // Eğer kaynak Equip ise, hedefteki item oraya geri dönebilir mi?
+                    if (_dragFromEquip)
+                    {
+                        if (!CanEquipItem(temp, _dragEquipIndex)) canSwap = false;
+                    }
+                    
+                    if (canSwap)
+                    {
+                        targetSlot.Item = _dragItem;
+                        targetSlot.Quantity = _dragSourceSlot.Quantity; // Kaynaktaki miktarı koru
+                        
+                        _dragSourceSlot.Item = temp;
+                        _dragSourceSlot.Quantity = tempQty;
+                        
+                        if (_dragFromEquip) FireEquipEvent(_dragEquipIndex, temp);
+                        handled = true;
+                    }
+                }
+            }
+        }
+        // 2. Equipment Slot Üzerine Bırakıldı
+        else if (_hoveredEquipSlot >= 0)
+        {
+            // Hedef slot
+             InventorySlot targetSlot = _hoveredEquipSlot switch
+            {
+                0 => WeaponSlot,
+                1 => ArmorSlot,
+                2 => ShieldSlot,
+                3 => HelmetSlot,
+                _ => null
+            };
+            
+            // --- GÜÇLENDİRME TAŞI KONTROLÜ ---
+            // Eğer elimizdeki item bir "Enhancement Stone" (ID 99) ise ve bir ekipmanın üzerine bırakıyorsak
+            if (_dragItem.Id == 99 && targetSlot != null && !targetSlot.IsEmpty)
+            {
+                // Yükseltme penceresini aç
+                OnEnhancementTargetSelected?.Invoke(targetSlot.Item);
+                
+                // Taşı geri yerine koy (işlem bitmedi, UI açıldı sadece)
+                CancelDrag();
                 return;
             }
-            // Boş yere tıkladıysa iptal et
-            else if (targetItem == null)
+            // ----------------------------------
+            
+            // Normal Equip Logic
+            if (CanEquipItem(_dragItem, _hoveredEquipSlot))
             {
-                IsEnhancementMode = false;
-                return;
+                if (targetSlot.IsEmpty)
+                {
+                    targetSlot.Item = _dragItem;
+                    targetSlot.Quantity = _dragSourceSlot.Quantity;
+                    _dragSourceSlot.Quantity = 0;
+                    
+                    FireEquipEvent(_hoveredEquipSlot, _dragItem);
+                    if (_dragFromEquip) FireEquipEvent(_dragEquipIndex, null); // Eski yer boşaldı
+                    handled = true;
+                }
+                else
+                {
+                    // Swap
+                    Item temp = targetSlot.Item;
+                    int tempQty = targetSlot.Quantity;
+                    
+                    // Hedefteki item kaynağa gidebilir mi? (Kaynak Equip ise kontrol lazım)
+                    bool canSwap = true;
+                    if (_dragFromEquip)
+                    {
+                         if (!CanEquipItem(temp, _dragEquipIndex)) canSwap = false;
+                    }
+                    
+                    if (canSwap)
+                    {
+                        targetSlot.Item = _dragItem;
+                        targetSlot.Quantity = _dragSourceSlot.Quantity;
+                        
+                        _dragSourceSlot.Item = temp;
+                        _dragSourceSlot.Quantity = tempQty;
+                        
+                        FireEquipEvent(_hoveredEquipSlot, _dragItem);
+                        if (_dragFromEquip) FireEquipEvent(_dragEquipIndex, temp);
+                        
+                        handled = true;
+                    }
+                }
             }
         }
         
-        // Grid slot tıklama
-        if (_hoveredSlot.X >= 0)
+        if (!handled)
         {
-            var slot = _slots[_currentPage, _hoveredSlot.Y, _hoveredSlot.X];
-            
-            if (_selectedSlot == null)
-            {
-                // Slot seç
-                if (!slot.IsEmpty)
-                {
-                    _selectedSlot = slot;
-                    _selectedGridPos = _hoveredSlot;
-                    _isFromEquipment = false;
-                }
-            }
-            else
-            {
-                // Slot'a bırak veya değiştir
-                
-                // Eğer ekipmandan geliyorsa ve hedef slot doluysa, hedef slotun tipi uygun mu?
-                bool canSwap = true;
-                if (_isFromEquipment && !slot.IsEmpty)
-                {
-                   if (_selectedEquipIndex == 0 && slot.Item.Type != ItemType.Weapon) canSwap = false;
-                   if (_selectedEquipIndex == 1 && slot.Item.Type != ItemType.Armor) canSwap = false;
-                }
-                
-                if (canSwap)
-                {
-                    SwapOrMove(_selectedSlot, slot);
-                    
-                    // Event tetikle (Ekipman değişti)
-                    if (_isFromEquipment)
-                    {
-                         if (_selectedEquipIndex == 0) OnWeaponEquipped?.Invoke(WeaponSlot.Item);
-                         else if (_selectedEquipIndex == 1) OnArmorEquipped?.Invoke(ArmorSlot.Item);
-                    }
-                    _selectedSlot = null;
-                }
-            }
+            CancelDrag();
         }
-        // Equipment slot tıklama
-        else if (_hoveredEquipSlot >= 0)
+        
+        _isDragging = false;
+        _dragSourceSlot = null;
+        _dragItem = null;
+    }
+    
+    private void CancelDrag()
+    {
+        // İptal, geri koy
+        if (_dragSourceSlot != null && _dragItem != null)
         {
-            var equipSlot = _hoveredEquipSlot == 0 ? WeaponSlot : ArmorSlot;
-            
-            if (_selectedSlot == null)
-            {
-                if (!equipSlot.IsEmpty)
-                {
-                    _selectedSlot = equipSlot;
-                    _selectedEquipIndex = _hoveredEquipSlot;
-                    _isFromEquipment = true;
-                }
-            }
-            else
-            {
-                // Equipment slot'una yerleştir (sadece uygun item)
-                if (!_isFromEquipment && _selectedSlot.Item != null)
-                {
-                    if ((_hoveredEquipSlot == 0 && _selectedSlot.Item.Type == ItemType.Weapon) ||
-                        (_hoveredEquipSlot == 1 && _selectedSlot.Item.Type == ItemType.Armor))
-                    {
-                        SwapOrMove(_selectedSlot, equipSlot);
-                        
-                        // Event tetikle
-                        if (_hoveredEquipSlot == 0)
-                            OnWeaponEquipped?.Invoke(WeaponSlot.Item);
-                        else
-                            OnArmorEquipped?.Invoke(ArmorSlot.Item);
-                    }
-                }
-                _selectedSlot = null;
-            }
+            _dragSourceSlot.Item = _dragItem;
+            // Quantity zaten değişmediyse sorun yok, ama biz 0 yapmıştık yukarıda belki?
+            // Evet BeginDrag'da quantity ellemedik, sadece Item=null yaptık.
+            // Ama EndDrag logiclerinde quantity set ettik. 
+            // Basitçe: Quantity'yi item null iken önemsiz varsayıyoruz, item geri gelince quantity anlam kazanır.
+            // Ama source slotun quantity'si hiç silinmediyse (BeginDrag'da silmedik), sorun yok.
         }
-        else
-        {
-            // Boş alana tıklandı, seçimi iptal et
-            _selectedSlot = null;
-        }
+    }
+    
+    private bool CanEquipItem(Item item, int slotIndex)
+    {
+        if (item == null) return false;
+        if (slotIndex == 0 && item.Type == ItemType.Weapon) return true;
+        if (slotIndex == 1 && item.Type == ItemType.Armor) return true;
+        if (slotIndex == 2 && item.Type == ItemType.Shield) return true;
+        if (slotIndex == 3 && item.Type == ItemType.Helmet) return true;
+        return false;
+    }
+    
+    private void FireEquipEvent(int slotIndex, Item item)
+    {
+        if (slotIndex == 0) OnWeaponEquipped?.Invoke(item);
+        else if (slotIndex == 1) OnArmorEquipped?.Invoke(item);
+        else if (slotIndex == 2) OnShieldEquipped?.Invoke(item);
+        else if (slotIndex == 3) OnHelmetEquipped?.Invoke(item);
     }
     
     private void HandleRightClick(Point mousePos)
@@ -1005,9 +1140,24 @@ public class Inventory
             0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
         
         // Tooltip çiz
-        if (_tooltipItem != null)
+        if (_tooltipItem != null && !_isDragging) // Drag yaparken tooltip gizle
         {
             DrawTooltip(spriteBatch, font, _tooltipItem, _tooltipPosition);
+        }
+        
+        // Drag Item Çiz (En Üstte)
+        if (_isDragging && _dragItem != null)
+        {
+             Vector2 mousePos = new Vector2(Mouse.GetState().X, Mouse.GetState().Y);
+             // Mouse ortalansın (25, 25 offset)
+             Rectangle dragRect = new Rectangle((int)mousePos.X - 25, (int)mousePos.Y - 25, 50, 50);
+             spriteBatch.Draw(_dragItem.Icon, dragRect, Color.White * 0.9f);
+             
+             // Miktar
+             if (_dragSourceSlot != null && _dragSourceSlot.Quantity > 1)
+             {
+                 spriteBatch.DrawString(font, _dragSourceSlot.Quantity.ToString(), mousePos + new Vector2(10, 10), Color.White);
+             }
         }
     }
     
