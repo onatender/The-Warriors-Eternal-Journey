@@ -968,23 +968,52 @@ public class Player
             }
         }
         
-        // 2. Kılıç Alevi (ID 10) - Duruşta
-        if (_equippedWeapon != null && _equippedWeapon.Id == 10 && !_isAttacking)
+        // 2. Kılıç Alevi (ID 10) - Ebedi Kılıç (Lightbringer Style)
+        if (_equippedWeapon != null && _equippedWeapon.Id == 10)
         {
-            float handOffsetX = _facingDirection == 1 ? _width - 8 : -4;
-            float handOffsetY = _height / 2 + 5;
-            Vector2 weaponPos = new Vector2(_position.X + handOffsetX, _position.Y + handOffsetY);
+            // Omuz ve El pozisyonlarını hesapla (DrawWeapon ile uyumlu olması için)
+            float shoulderOffsetX = _facingDirection == 1 ? 36 : 12;
+            Vector2 shoulderPos = _position + new Vector2(shoulderOffsetX, 26);
+            float baseRotation = _facingDirection == 1 ? -1.0f : 1.0f; 
             
-            if (_random.NextDouble() < 0.2)
+            float animationRot = 0f;
+            if (_isAttacking) {
+                float t = _attackTimer / MathF.PI; 
+                float startAngle = _facingDirection == 1 ? -2.5f : 2.5f;
+                float endAngle = _facingDirection == 1 ? 1.5f : -1.5f;
+                baseRotation = MathHelper.Lerp(startAngle, endAngle, t);
+            }
+            else if (_isMoving) animationRot = MathF.Sin(_animationTimer) * 0.3f;
+            else animationRot = MathF.Sin(_animationTimer * 0.2f) * 0.05f;
+
+            float finalRotation = baseRotation + animationRot;
+            float weaponRot = _isSpinning ? _spinTimer * 20f : (_isAttacking ? finalRotation : (_facingDirection == 1 ? 0.2f : -0.2f));
+            if (!_isSpinning && !_isAttacking) weaponRot += animationRot * 0.5f;
+
+            Matrix mat = Matrix.CreateRotationZ(finalRotation);
+            Vector2 handPos = shoulderPos + Vector2.Transform(new Vector2(0, 14), mat);
+            
+            // Kılıç boyu ~42 px (kabo hariç). Her frame kılıç boyunca 3-5 parçacık üret.
+            for (int i = 0; i < 4; i++)
             {
+                float distAlongBlade = (float)_random.NextDouble() * 38f + 5f; // Guard'dan uca doğru
+                Vector2 particlePos = handPos + Vector2.Transform(new Vector2(0, -distAlongBlade), Matrix.CreateRotationZ(weaponRot));
+                
+                Color pCol = _random.Next(4) switch {
+                    0 => Color.White,
+                    1 => Color.Yellow,
+                    2 => Color.Orange,
+                    _ => Color.OrangeRed
+                };
+
                 _particles.Add(new PlayerParticle
                 {
-                    Position = weaponPos + new Vector2(_random.Next(-5, 6), _random.Next(-5, 6)),
-                    Velocity = new Vector2(0, -_random.Next(30, 80)),
-                    Color = Color.Orange,
-                    Size = _random.Next(2, 5),
-                    Life = 0.5f,
-                    Decay = 2.0f,
+                    Position = particlePos + new Vector2(_random.Next(-3, 4), _random.Next(-3, 4)),
+                    Velocity = new Vector2(_random.Next(-20, 21), -_random.Next(40, 100)),
+                    Color = pCol,
+                    Size = (float)_random.NextDouble() * 3f + 2f,
+                    Life = 0.6f + (float)_random.NextDouble() * 0.4f,
+                    Decay = 1.5f + (float)_random.NextDouble() * 1.5f,
                     IsBehind = false
                 });
             }
@@ -1186,7 +1215,32 @@ public class Player
             weaponRot += animationRot * 0.5f;
         }
         
+        // --- SİLAH VE EFEKT ÇİZİMİ ---
+        bool isLegendaryWeapon = _equippedWeapon != null && _equippedWeapon.Id == 10;
+        
         spriteBatch.Draw(_weaponTexture, handPos, null, Color.White, weaponRot, weaponOrigin, 1f, SpriteEffects.None, 0f);
+
+        if (isLegendaryWeapon)
+        {
+            // 2. Bright Pulse Core (Kılıcın ortasında parlayan ince bir çizgi)
+            float corePulse = (float)Math.Sin(_animationTimer * 15f) * 0.2f + 0.8f;
+            Color coreColor = Color.White * 0.6f * corePulse;
+            
+            // Kılıç namlusu boyunca ince bir çizgi
+            Vector2 bladeStart = handPos + Vector2.Transform(new Vector2(0, -5), Matrix.CreateRotationZ(weaponRot));
+            Vector2 bladeEnd = handPos + Vector2.Transform(new Vector2(0, -40), Matrix.CreateRotationZ(weaponRot));
+            
+            DrawLine(spriteBatch, bladeStart, bladeEnd, coreColor, 2);
+        }
+    }
+
+    private void DrawLine(SpriteBatch sb, Vector2 start, Vector2 end, Color color, int thickness = 1)
+    {
+        Vector2 edge = end - start;
+        float angle = (float)Math.Atan2(edge.Y, edge.X);
+        sb.Draw(_pixelTexture,
+            new Rectangle((int)start.X, (int)start.Y, (int)edge.Length(), thickness),
+            null, color, angle, Vector2.Zero, SpriteEffects.None, 0);
     }
     
     public Item GetEquippedWeapon() => _equippedWeapon;

@@ -145,11 +145,11 @@ public partial class Game1 : Game
     
     private void OnTitleScreenStart(int slotIndex, string newName)
     {
+        _currentState = GameState.Playing;
         _currentSlotIndex = slotIndex;
         
         if (newName != null)
         {
-            // --- YENİ OYUN ---
             _playerName = newName;
             
             // Başlangıç itemlarını envantere ekle
@@ -245,8 +245,7 @@ public partial class Game1 : Game
                  }
              }
          }
-        
-        _currentState = GameState.Playing;
+
     }
     
     private void SaveCurrentGame()

@@ -69,15 +69,16 @@ public class Item
     
     public Color GetRarityColor()
     {
-        return Rarity switch
-        {
-            ItemRarity.Common => new Color(200, 200, 200),
-            ItemRarity.Uncommon => new Color(100, 200, 100),
-            ItemRarity.Rare => new Color(100, 150, 255),
-            ItemRarity.Epic => new Color(180, 100, 255),
-            ItemRarity.Legendary => new Color(255, 150, 50),
-            _ => Color.White
-        };
+        // Kullanıcı tüm nadirlik renklerini kaldırmak istedi, her şeyi beyaz/varsayılan yapıyoruz.
+        return Color.White;
+    }
+
+    public Color GetTintColor()
+    {
+        // Eğer manuel bir renk set edildiyse o önceliklidir (Tılsımlar vb.)
+        if (IconColor != Color.White) return IconColor;
+        // Aksi takdirde nadirlik rengini kullan
+        return GetRarityColor();
     }
 
     public Item Clone()
@@ -232,7 +233,7 @@ public static class ItemDatabase
             Name = "Deri Zirh",
             Description = "Dayanikli deri zirh",
             Type = ItemType.Armor,
-            Rarity = ItemRarity.Uncommon, // Biraz daha iyi
+            Rarity = ItemRarity.Common,
             RequiredLevel = 1,
             EnhancementLevel = 0,
             Defense = 10,
@@ -251,7 +252,7 @@ public static class ItemDatabase
             Name = "Guclendirme Tasi",
             Description = "Bu tas esyalarinin seviyesini yukseltmenize yarar.",
             Type = ItemType.Material,
-            Rarity = ItemRarity.Rare,
+            Rarity = ItemRarity.Common,
             RequiredLevel = 1,
             BuyPrice = 250, // Rebalance: Enhancement Stone
             Icon = upgradeStone ?? CreateMaterialIcon(graphicsDevice, Color.Cyan)
@@ -264,7 +265,7 @@ public static class ItemDatabase
             Name = "Ebedi Kilic",
             Description = "Efsanelere konu olmus, sonsuz guc barindiran kilic.",
             Type = ItemType.Weapon,
-            Rarity = ItemRarity.Legendary,
+            Rarity = ItemRarity.Common,
             RequiredLevel = 25, // Hileli olduğu için level 1
             EnhancementLevel = 0, 
             MinDamage = 100,
@@ -281,14 +282,14 @@ public static class ItemDatabase
             Name = "Ejderha Zirhi",
             Description = "Ejderha pullarindan yapilmis, asilmaz bir zirh.",
             Type = ItemType.Armor,
-            Rarity = ItemRarity.Legendary,
+            Rarity = ItemRarity.Common,
             RequiredLevel = 25,
             EnhancementLevel = 0,
             Defense = 50,
             Health = 200,
             BuyPrice = 1000000,
             Icon = armor2, // chestplate_2
-            IconColor = Color.Red // Tint Red
+            IconColor = Color.White // Original color
         };
 
         // ID 25: Can İksiri
@@ -332,7 +333,7 @@ public static class ItemDatabase
             Name = "Sans Tilsimi (+%25)",
             Description = "Yukseltme sansini %25 artirir.",
             Type = ItemType.Material,
-            Rarity = ItemRarity.Rare,
+            Rarity = ItemRarity.Common,
             BuyPrice = 750, // Rebalance: +25%
             Icon = charm ?? CreateScrollIcon(graphicsDevice, new Color(255, 250, 220), new Color(50, 50, 150)),
             IconColor = Color.LightBlue // TINT
@@ -345,7 +346,7 @@ public static class ItemDatabase
             Name = "Sans Tilsimi (+%50)",
             Description = "Yukseltme sansini %50 artirir!",
             Type = ItemType.Material,
-            Rarity = ItemRarity.Legendary,
+            Rarity = ItemRarity.Common,
             BuyPrice = 2500, // Rebalance: +50%
             Icon = charm ?? CreateScrollIcon(graphicsDevice, new Color(255, 215, 0), new Color(200, 0, 0)),
             IconColor = Color.Gold // TINT
@@ -358,7 +359,7 @@ public static class ItemDatabase
             Name = "Muska",
             Description = "Basarisiz yukseltmede esyanin yok olmasini engeller, ancak seviyesi duser.",
             Type = ItemType.Material,
-            Rarity = ItemRarity.Rare,
+            Rarity = ItemRarity.Common,
             BuyPrice = 1500, // Rebalance: Amulet
             Icon = amulet ?? CreateAmuletIcon(graphicsDevice, Color.Silver, Color.Gray),
             IconColor = Color.Silver // TINT
@@ -371,10 +372,23 @@ public static class ItemDatabase
             Name = "Buyulu Muska",
             Description = "Basarisiz yukseltmede esyayi tamamen korur.",
             Type = ItemType.Material,
-            Rarity = ItemRarity.Legendary,
-            BuyPrice = 5000, // Rebalance: Magic Amulet
+            Rarity = ItemRarity.Common,
+            BuyPrice = 5000,
             Icon = amulet ?? CreateAmuletIcon(graphicsDevice, Color.Gold, Color.Purple),
-            IconColor = Color.Violet // TINT
+            IconColor = Color.Violet
+        };
+
+        // ID 32: İlahi Tılsım
+        _items[32] = new Item
+        {
+            Id = 32,
+            Name = "Ilahi Tilsim",
+            Description = "Yukseltme sansini %100 yapar.",
+            Type = ItemType.Material,
+            Rarity = ItemRarity.Common,
+            BuyPrice = 1000000,
+            Icon = charm ?? CreateScrollIcon(graphicsDevice, Color.OrangeRed, Color.Orange),
+            IconColor = Color.OrangeRed
         };
 
         // === KALKANLAR ===
@@ -401,7 +415,7 @@ public static class ItemDatabase
             Name = "Demir Kalkan",
             Description = "Saglam demir kalkan. Yuksek bloklama sansi.",
             Type = ItemType.Shield,
-            Rarity = ItemRarity.Uncommon,
+            Rarity = ItemRarity.Common, // Revert to common to remove green tint if user wants "original" look
             RequiredLevel = 1,
             Defense = 12,
             BlockChance = 18,

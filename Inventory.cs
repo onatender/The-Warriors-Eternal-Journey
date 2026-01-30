@@ -35,12 +35,13 @@ public class Inventory
     public void Open()
     {
         IsOpen = true;
+        _player?.StopMoving();
     }
     
     public void Close()
     {
+        if (_isDragging) CancelDrag();
         IsOpen = false;
-        // Seçim iptali vs. eklenmesi gerekirse buraya
         _selectedSlot = null;
         _hoveredSlot = new Point(-1, -1);
     }
@@ -66,6 +67,7 @@ public class Inventory
     private Texture2D _armorSlotIcon;
     private Texture2D _shieldSlotIcon;
     private Texture2D _helmetSlotIcon;
+    private Texture2D _pixelTexture;
     
     // SFX
     private SoundEffect _sfxCoinPickup;
@@ -127,6 +129,8 @@ public class Inventory
     public bool IsEnhancementMode { get; set; } = false;
     
     private Player _player;
+    private float _animationTimer;
+    private Random _rng = new Random();
     
     public void SetPlayer(Player player)
     {
@@ -174,6 +178,9 @@ public class Inventory
     
     private void CreateTextures(GraphicsDevice graphicsDevice, Microsoft.Xna.Framework.Content.ContentManager content)
     {
+        _pixelTexture = new Texture2D(graphicsDevice, 1, 1);
+        _pixelTexture.SetData(new[] { Color.White });
+
         // Normal slot texture
         _slotTexture = new Texture2D(graphicsDevice, SLOT_SIZE, SLOT_SIZE);
         Color[] slotColors = new Color[SLOT_SIZE * SLOT_SIZE];
@@ -491,12 +498,13 @@ public class Inventory
     
     public void Update(GameTime gameTime, KeyboardState currentKeyState, MouseState currentMouseState)
     {
+        _animationTimer += (float)gameTime.ElapsedGameTime.TotalSeconds;
+
         // I tuşu ile aç/kapa
         if (currentKeyState.IsKeyDown(Keys.I) && !_previousKeyState.IsKeyDown(Keys.I))
         {
-            IsOpen = !IsOpen;
-            _selectedSlot = null; // Seçimi sıfırla
-            if (IsOpen) _player?.StopMoving();
+            if (IsOpen) Close();
+            else Open();
         }
         
         if (IsOpen)
@@ -851,15 +859,15 @@ public class Inventory
     private void CancelDrag()
     {
         // İptal, geri koy
-        if (_dragSourceSlot != null && _dragItem != null)
+        if (_isDragging && _dragSourceSlot != null && _dragItem != null)
         {
             _dragSourceSlot.Item = _dragItem;
-            // Quantity zaten değişmediyse sorun yok, ama biz 0 yapmıştık yukarıda belki?
-            // Evet BeginDrag'da quantity ellemedik, sadece Item=null yaptık.
-            // Ama EndDrag logiclerinde quantity set ettik. 
-            // Basitçe: Quantity'yi item null iken önemsiz varsayıyoruz, item geri gelince quantity anlam kazanır.
-            // Ama source slotun quantity'si hiç silinmediyse (BeginDrag'da silmedik), sorun yok.
         }
+
+        // State'i temizle
+        _isDragging = false;
+        _dragSourceSlot = null;
+        _dragItem = null;
     }
     
     private bool CanEquipItem(Item item, int slotIndex)
@@ -1057,7 +1065,13 @@ public class Inventory
                         SLOT_SIZE - 10,
                         SLOT_SIZE - 10
                     );
-                    spriteBatch.Draw(slot.Item.Icon, iconRect, slot.Item.GetRarityColor());
+                    spriteBatch.Draw(slot.Item.Icon, iconRect, slot.Item.GetTintColor());
+                    
+                    // İlahi Efekt (ID 32: Tılsım, ID 10: Ebedi Kılıç)
+                    if (slot.Item.Id == 32 || slot.Item.Id == 10)
+                    {
+                        DrawDivineEffect(spriteBatch, iconRect);
+                    }
                     
                     // Miktar Yazısı
                     if (slot.Quantity > 1)
@@ -1151,7 +1165,7 @@ public class Inventory
              Vector2 mousePos = new Vector2(Mouse.GetState().X, Mouse.GetState().Y);
              // Mouse ortalansın (25, 25 offset)
              Rectangle dragRect = new Rectangle((int)mousePos.X - 25, (int)mousePos.Y - 25, 50, 50);
-             spriteBatch.Draw(_dragItem.Icon, dragRect, Color.White * 0.9f);
+             spriteBatch.Draw(_dragItem.Icon, dragRect, _dragItem.GetTintColor() * 0.9f);
              
              // Miktar
              if (_dragSourceSlot != null && _dragSourceSlot.Quantity > 1)
@@ -1178,7 +1192,7 @@ public class Inventory
         {
             // Item ikonu
             Rectangle iconRect = new Rectangle(rect.X + 10, rect.Y + 10, 40, 40);
-            spriteBatch.Draw(slot.Item.Icon, iconRect, slot.Item.GetRarityColor());
+            spriteBatch.Draw(slot.Item.Icon, iconRect, slot.Item.GetTintColor());
         }
     }
     
@@ -1536,5 +1550,54 @@ public class Inventory
                 }
             }
         }
+    }
+
+    private void DrawDivineEffect(SpriteBatch sb, Rectangle rect)
+    {
+        float time = _animationTimer;
+        Vector2 center = rect.Center.ToVector2();
+        
+        // 1. Çakan Yıldırımlar
+        // Her 0.6 saniyede bir kısa süreli şimşek çaksın
+        float phase = time % 0.6f;
+        if (phase < 0.12f)
+        {
+            Random rnd = new Random((int)(time * 15f) + rect.X + rect.Y);
+            Vector2 p1 = new Vector2(rect.X + rnd.Next(5, rect.Width - 5), rect.Y + 5);
+            Vector2 p2 = p1 + new Vector2(rnd.Next(-12, 13), rnd.Next(10, 18));
+            Vector2 p3 = p2 + new Vector2(rnd.Next(-12, 13), rnd.Next(10, 18));
+            
+            Color strikeCol = rnd.Next(2) == 0 ? Color.White : Color.LightCyan;
+            float strikeAlpha = 0.8f * (1.0f - (phase / 0.12f)); // Fade out during flash
+            
+            DrawLine(sb, p1, p2, strikeCol * strikeAlpha, 2);
+            DrawLine(sb, p2, p3, strikeCol * strikeAlpha, 2);
+            
+            // Küçük kıvılcımlar
+            for(int i=0; i<3; i++) {
+                sb.Draw(_pixelTexture, new Rectangle((int)p3.X + rnd.Next(-5,6), (int)p3.Y + rnd.Next(-5,6), 2, 2), Color.Gold * strikeAlpha);
+            }
+        }
+        
+        // 3. Kutsal Parçacıklar (Daha kısıtlı ve yukarı süzülen)
+        for (int i = 0; i < 4; i++)
+        {
+            float seed = i * 123.45f;
+            float pTime = (time * 1.5f + i * 0.25f) % 1.0f;
+            float pX = (float)Math.Sin(seed + time * 2f) * (rect.Width / 3f);
+            float pY = (rect.Height / 4f) - pTime * 30f;
+            float alpha = 1f - pTime;
+            
+            sb.Draw(_pixelTexture, new Rectangle((int)(center.X + pX), (int)(center.Y + pY), 2, 2), Color.White * alpha * 0.5f);
+        }
+    }
+
+    private void DrawLine(SpriteBatch sb, Vector2 start, Vector2 end, Color color, int thickness = 1)
+    {
+        Vector2 edge = end - start;
+        float angle = (float)Math.Atan2(edge.Y, edge.X);
+        sb.Draw(_pixelTexture,
+            new Rectangle((int)start.X, (int)start.Y, (int)edge.Length(), thickness),
+            null, color, angle, Vector2.Zero, SpriteEffects.None, 0);
     }
 }

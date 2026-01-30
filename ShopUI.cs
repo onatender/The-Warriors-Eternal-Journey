@@ -28,7 +28,7 @@ public class ShopUI
     private const int GRID_ROWS = 6;
     
     // Satıcının satılık item ID'leri
-    private List<int> _shopItemIds = new List<int> { 1, 2, 3, 10, 11, 40, 41, 50, 51, 99, 25, 20, 21, 22, 30, 31 };
+    private List<int> _shopItemIds = new List<int> { 1, 2, 3, 10, 11, 40, 41, 50, 51, 99, 25, 20, 21, 22, 30, 31, 32 };
     
     // Hover
     private int _hoveredPlayerSlot = -1; // Hangi oyuncu slotuna hover edildi
@@ -49,6 +49,7 @@ public class ShopUI
     // Scroll
     private int _playerScrollOffset = 0;
     private int _shopScrollOffset = 0;
+    private float _animationTimer = 0f;
     
     // SFX
     private SoundEffect _sfxBuy;
@@ -129,6 +130,7 @@ public class ShopUI
     
     public void Update(GameTime gameTime, KeyboardState currentKeyState, MouseState currentMouseState)
     {
+        _animationTimer += (float)gameTime.ElapsedGameTime.TotalSeconds;
         if (!IsOpen) return;
         
         // ESC veya F ile kapat
@@ -333,6 +335,11 @@ public class ShopUI
                 spriteBatch.Draw(itemInfo.item.Icon, 
                     new Rectangle(slotRect.X + 5, slotRect.Y + 5, SLOT_SIZE - 10, SLOT_SIZE - 10),
                     itemInfo.item.GetRarityColor());
+
+                if (itemInfo.item.Id == 32 || itemInfo.item.Id == 10)
+                {
+                    DrawDivineEffect(spriteBatch, slotRect);
+                }
             }
 
             // Adet Göster
@@ -374,10 +381,14 @@ public class ShopUI
             
             if (item.Icon != null)
             {
-                Color iconColor = canAfford ? item.GetRarityColor() : new Color(100, 100, 100);
-                spriteBatch.Draw(item.Icon, 
-                    new Rectangle(slotRect.X + 5, slotRect.Y + 5, SLOT_SIZE - 10, SLOT_SIZE - 10),
-                    iconColor);
+                Color iconColor = canAfford ? item.GetTintColor() : new Color(100, 100, 100);
+                Rectangle iconRect = new Rectangle(slotRect.X + 5, slotRect.Y + 5, SLOT_SIZE - 10, SLOT_SIZE - 10);
+                spriteBatch.Draw(item.Icon, iconRect, iconColor);
+
+                if (item.Id == 32 || item.Id == 10)
+                {
+                    DrawDivineEffect(spriteBatch, slotRect);
+                }
             }
             
             // Alış fiyatı göster
@@ -499,5 +510,52 @@ public class ShopUI
         
         spriteBatch.DrawString(font, priceText, position + new Vector2(0, yOffset), priceColor,
             0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+    }
+
+    private void DrawDivineEffect(SpriteBatch sb, Rectangle rect)
+    {
+        float time = _animationTimer;
+        Vector2 center = rect.Center.ToVector2();
+        
+        // 1. Çakan Yıldırımlar
+        float phase = time % 0.6f;
+        if (phase < 0.12f)
+        {
+            Random rnd = new Random((int)(time * 15f) + rect.X + rect.Y);
+            Vector2 p1 = new Vector2(rect.X + rnd.Next(5, rect.Width - 5), rect.Y + 5);
+            Vector2 p2 = p1 + new Vector2(rnd.Next(-12, 13), rnd.Next(10, 18));
+            Vector2 p3 = p2 + new Vector2(rnd.Next(-12, 13), rnd.Next(10, 18));
+            
+            Color strikeCol = rnd.Next(2) == 0 ? Color.White : Color.LightCyan;
+            float strikeAlpha = 0.8f * (1.0f - (phase / 0.12f));
+            
+            DrawLine(sb, p1, p2, strikeCol * strikeAlpha, 2);
+            DrawLine(sb, p2, p3, strikeCol * strikeAlpha, 2);
+            
+            for(int i=0; i<3; i++) {
+                sb.Draw(_backgroundTexture, new Rectangle((int)p3.X + rnd.Next(-5,6), (int)p3.Y + rnd.Next(-5,6), 2, 2), Color.Gold * strikeAlpha);
+            }
+        }
+        
+        // 3. Kutsal Parçacıklar
+        for (int i = 0; i < 4; i++)
+        {
+            float seed = i * 123.45f;
+            float pTime = (time * 1.5f + i * 0.25f) % 1.0f;
+            float pX = (float)Math.Sin(seed + time * 2f) * (rect.Width / 3f);
+            float pY = (rect.Height / 4f) - pTime * 30f;
+            float alpha = 1f - pTime;
+            
+            sb.Draw(_backgroundTexture, new Rectangle((int)(center.X + pX), (int)(center.Y + pY), 2, 2), Color.White * alpha * 0.5f);
+        }
+    }
+
+    private void DrawLine(SpriteBatch sb, Vector2 start, Vector2 end, Color color, int thickness = 1)
+    {
+        Vector2 edge = end - start;
+        float angle = (float)Math.Atan2(edge.Y, edge.X);
+        sb.Draw(_backgroundTexture,
+            new Rectangle((int)start.X, (int)start.Y, (int)edge.Length(), thickness),
+            null, color, angle, Vector2.Zero, SpriteEffects.None, 0);
     }
 }
