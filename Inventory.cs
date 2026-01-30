@@ -1164,7 +1164,7 @@ public class Inventory
         }
         
         // Kontrol ipuçları
-        string hint = "[E] Kapat  [Sag Tik] Giy/Kullan/Cikar";
+        string hint = "[E] Kapat  [Sağ Tık] Giy/Kullan/Çıkar";
         Vector2 hintPos = new Vector2(_position.X + 20, _position.Y + _bounds.Height - 18);
         spriteBatch.DrawString(font, hint, hintPos, new Color(150, 150, 150), 
             0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
@@ -1219,18 +1219,18 @@ public class Inventory
         string type = item.Type switch
         {
             ItemType.Weapon => "Silah",
-            ItemType.Armor => "Zirh",
+            ItemType.Armor => "Zırh",
             ItemType.Shield => "Kalkan",
             ItemType.Helmet => "Kask",
             ItemType.Material => "Malzeme",
-            _ => "Esya"
+            _ => "Eşya"
         };
         string level = item.RequiredLevel > 0 ? $"Gerekli Seviye: {item.RequiredLevel}" : "";
         
         string stats = "";
         if (item.Type == ItemType.Weapon)
         {
-            stats = $"Hasar: {item.MinDamage}-{item.MaxDamage}\nSaldiri Hizi: {item.AttackSpeed}";
+            stats = $"Hasar: {item.MinDamage}-{item.MaxDamage}\nSaldırı Hızı: {item.AttackSpeed}";
         }
         else if (item.Type == ItemType.Armor)
         {
@@ -1246,7 +1246,7 @@ public class Inventory
         }
         
         // Fiyat bilgisi
-        string priceInfo = $"Satis: {item.SellPrice}G | Alis: {item.BuyPrice}G";
+        string priceInfo = $"Satış: {item.SellPrice}G | Alış: {item.BuyPrice}G";
         
         // Açıklama Metni
         string description = item.Description ?? "";

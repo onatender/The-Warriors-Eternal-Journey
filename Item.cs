@@ -196,8 +196,8 @@ public static class ItemDatabase
         _items[1] = new Item
         {
             Id = 1,
-            Name = "Tahta Kilic",
-            Description = "Basit bir tahta kilic",
+            Name = "Tahta Kılıç",
+            Description = "Basit bir tahta kılıç",
             Type = ItemType.Weapon,
             Rarity = ItemRarity.Common,
             RequiredLevel = 1,
@@ -214,8 +214,8 @@ public static class ItemDatabase
         _items[2] = new Item
         {
             Id = 2,
-            Name = "Kumas Zirh",
-            Description = "Basit kumas zirh",
+            Name = "Kumaş Zırh",
+            Description = "Basit kumaş zırh",
             Type = ItemType.Armor,
             Rarity = ItemRarity.Common,
             RequiredLevel = 1,
@@ -230,8 +230,8 @@ public static class ItemDatabase
         _items[3] = new Item
         {
             Id = 3,
-            Name = "Deri Zirh",
-            Description = "Dayanikli deri zirh",
+            Name = "Deri Zırh",
+            Description = "Dayanıklı deri zırh",
             Type = ItemType.Armor,
             Rarity = ItemRarity.Common,
             RequiredLevel = 1,
@@ -249,8 +249,8 @@ public static class ItemDatabase
         _items[99] = new Item
         {
             Id = 99,
-            Name = "Guclendirme Tasi",
-            Description = "Bu tas esyalarinin seviyesini yukseltmenize yarar.",
+            Name = "Güçlendirme Taşı",
+            Description = "Bu taş eşyalarının seviyesini yükseltmenize yarar.",
             Type = ItemType.Material,
             Rarity = ItemRarity.Common,
             RequiredLevel = 1,
@@ -262,8 +262,8 @@ public static class ItemDatabase
         _items[10] = new Item
         {
             Id = 10,
-            Name = "Ebedi Kilic",
-            Description = "Efsanelere konu olmus, sonsuz guc barindiran kilic.",
+            Name = "Ebedi Kılıç",
+            Description = "Efsanelere konu olmuş, sonsuz güç barındıran kılıç.",
             Type = ItemType.Weapon,
             Rarity = ItemRarity.Common,
             RequiredLevel = 25, // Hileli olduğu için level 1
@@ -279,8 +279,8 @@ public static class ItemDatabase
         _items[11] = new Item
         {
             Id = 11,
-            Name = "Ejderha Zirhi",
-            Description = "Ejderha pullarindan yapilmis, asilmaz bir zirh.",
+            Name = "Ejderha Zırhı",
+            Description = "Ejderha pullarından yapılmış, aşılmaz bir zırh.",
             Type = ItemType.Armor,
             Rarity = ItemRarity.Common,
             RequiredLevel = 25,
@@ -300,7 +300,7 @@ public static class ItemDatabase
         _items[25] = new Item
         {
             Id = 25,
-            Name = "Can Iksiri",
+            Name = "Can İksiri",
             Description = "50 Can yeniler.",
             Type = ItemType.Consumable,
             Rarity = ItemRarity.Common,
@@ -317,8 +317,8 @@ public static class ItemDatabase
         _items[20] = new Item
         {
             Id = 20,
-            Name = "Sans Tilsimi (+%10)",
-            Description = "Yukseltme sansini %10 artirir.",
+            Name = "Şans Tılsımı (+%10)",
+            Description = "Yükseltme şansını %10 artırır.",
             Type = ItemType.Material,
             Rarity = ItemRarity.Common,
             BuyPrice = 300, // Rebalance: +10%
@@ -330,8 +330,8 @@ public static class ItemDatabase
         _items[21] = new Item
         {
             Id = 21,
-            Name = "Sans Tilsimi (+%25)",
-            Description = "Yukseltme sansini %25 artirir.",
+            Name = "Şans Tılsımı (+%25)",
+            Description = "Yükseltme şansını %25 artırır.",
             Type = ItemType.Material,
             Rarity = ItemRarity.Common,
             BuyPrice = 750, // Rebalance: +25%
@@ -343,8 +343,8 @@ public static class ItemDatabase
         _items[22] = new Item
         {
             Id = 22,
-            Name = "Sans Tilsimi (+%50)",
-            Description = "Yukseltme sansini %50 artirir!",
+            Name = "Şans Tılsımı (+%50)",
+            Description = "Yükseltme şansını %50 artırır!",
             Type = ItemType.Material,
             Rarity = ItemRarity.Common,
             BuyPrice = 2500, // Rebalance: +50%
@@ -357,7 +357,7 @@ public static class ItemDatabase
         {
             Id = 30,
             Name = "Muska",
-            Description = "Basarisiz yukseltmede esyanin yok olmasini engeller, ancak seviyesi duser.",
+            Description = "Başarısız yükseltmede eşyanın yok olmasını engeller, ancak seviyesi düşer.",
             Type = ItemType.Material,
             Rarity = ItemRarity.Common,
             BuyPrice = 1500, // Rebalance: Amulet
@@ -369,8 +369,8 @@ public static class ItemDatabase
         _items[31] = new Item
         {
             Id = 31,
-            Name = "Buyulu Muska",
-            Description = "Basarisiz yukseltmede esyayi tamamen korur.",
+            Name = "Büyülü Muska",
+            Description = "Başarısız yükseltmede eşyayı tamamen korur.",
             Type = ItemType.Material,
             Rarity = ItemRarity.Common,
             BuyPrice = 5000,
@@ -382,8 +382,8 @@ public static class ItemDatabase
         _items[32] = new Item
         {
             Id = 32,
-            Name = "Ilahi Tilsim",
-            Description = "Yukseltme sansini %100 yapar.",
+            Name = "İlahi Tılsım",
+            Description = "Yükseltme şansını %100 yapar.",
             Type = ItemType.Material,
             Rarity = ItemRarity.Common,
             BuyPrice = 1000000,
@@ -398,7 +398,7 @@ public static class ItemDatabase
         {
             Id = 40,
             Name = "Tahta Kalkan",
-            Description = "Basit tahta kalkan. Bloklama sansi verir.",
+            Description = "Basit tahta kalkan. Bloklama şansı verir.",
             Type = ItemType.Shield,
             Rarity = ItemRarity.Common,
             RequiredLevel = 1,
@@ -413,7 +413,7 @@ public static class ItemDatabase
         {
             Id = 41,
             Name = "Demir Kalkan",
-            Description = "Saglam demir kalkan. Yuksek bloklama sansi.",
+            Description = "Sağlam demir kalkan. Yüksek bloklama şansı.",
             Type = ItemType.Shield,
             Rarity = ItemRarity.Common, // Revert to common to remove green tint if user wants "original" look
             RequiredLevel = 1,
@@ -445,7 +445,7 @@ public static class ItemDatabase
         {
             Id = 51,
             Name = "Demir Kask",
-            Description = "Saglam demir kask.",
+            Description = "Sağlam demir kask.",
             Type = ItemType.Helmet,
             Rarity = ItemRarity.Common,
             RequiredLevel = 1,

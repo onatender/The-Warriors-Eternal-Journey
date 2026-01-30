@@ -302,13 +302,13 @@ public class ShopUI
             new Color(0, 0, 0, 200));
         
         // Oyuncu paneli
-        DrawPanel(spriteBatch, _playerPanelBounds, "ESYALARIM", new Color(60, 80, 60));
+        DrawPanel(spriteBatch, _playerPanelBounds, "EŞYALARIM", new Color(60, 80, 60));
         
         // Satıcı paneli
         DrawPanel(spriteBatch, _shopPanelBounds, "SATICI", new Color(80, 60, 80));
         
         // Altın göstergesi (ortada)
-        string goldText = $"Altin: {_player.Gold} G";
+        string goldText = $"Altın: {_player.Gold} G";
         Vector2 goldSize = font.MeasureString(goldText);
         Vector2 goldPos = new Vector2(
             (_playerPanelBounds.Right + _shopPanelBounds.Left) / 2 - goldSize.X / 2,
@@ -413,7 +413,7 @@ public class ShopUI
             new Color(150, 150, 150), 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
         
         // İpucu
-        string hintText = "Sol Tik: Sat/Al";
+        string hintText = "Sol Tık: Sat/Al";
         spriteBatch.DrawString(font, hintText, 
             new Vector2((_screenWidth - font.MeasureString(hintText).X * 0.6f) / 2, _shopPanelBounds.Bottom + 30),
             new Color(120, 120, 120), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
@@ -443,11 +443,11 @@ public class ShopUI
         string type = item.Type switch
         {
             ItemType.Weapon => "Silah",
-            ItemType.Armor => "Zirh",
+            ItemType.Armor => "Zırh",
             ItemType.Shield => "Kalkan",
             ItemType.Helmet => "Kask",
             ItemType.Material => "Malzeme",
-            _ => "Esya"
+            _ => "Eşya"
         };
         
         string stats = "";
@@ -459,8 +459,8 @@ public class ShopUI
             stats = $"Savunma: +{item.Defense} | Blok: %{item.BlockChance}";
         
         string priceText = showSellPrice 
-            ? $"Satis Bedeli: {item.SellPrice}G" 
-            : $"Alis Bedeli: {item.BuyPrice}G";
+            ? $"Satış Bedeli: {item.SellPrice}G" 
+            : $"Alış Bedeli: {item.BuyPrice}G";
         
         Color priceColor = showSellPrice ? Color.LightGreen : Color.Gold;
         

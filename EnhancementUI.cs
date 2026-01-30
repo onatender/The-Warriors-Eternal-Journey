@@ -250,7 +250,7 @@ public class EnhancementUI
         
         if (_player.Gold < _costGold)
         {
-            _resultMessage = "Yetersiz Altin!";
+            _resultMessage = "Yetersiz Altın!";
             _resultColor = Color.Red;
             CreateParticles(_windowBounds.Center.ToVector2(), Color.Gray, 10);
             return;
@@ -258,7 +258,7 @@ public class EnhancementUI
         
         if (stoneCount < _costStones)
         {
-            _resultMessage = "Yetersiz Tas!";
+            _resultMessage = "Yetersiz Taş!";
             _resultColor = Color.Red;
             return;
         }
@@ -292,7 +292,7 @@ public class EnhancementUI
             // BAŞARILI
             _sfxSuccess?.Play();
             _targetItem.UpgradeSuccess();
-            _resultMessage = "YUKSELTME BASARILI!";
+            _resultMessage = "YÜKSELTME BAŞARILI!";
             _resultColor = Color.LightGreen; // Gold yerine açık yeşil daha okunur olabilir veya Gold kalsın ama arka plan ekleyeceğiz
             
             CreateParticles(_windowBounds.Center.ToVector2(), Color.Gold, 50);
@@ -318,7 +318,7 @@ public class EnhancementUI
                 if (_selectedProtection.Id == 31) // Büyülü
                 {
                     protectedItem = true;
-                    _resultMessage = "BASARISIZ (KORUNDU!)";
+                    _resultMessage = "BAŞARISIZ (KORUNDU!)";
                     _resultColor = Color.Orange;
                     CreateParticles(_windowBounds.Center.ToVector2(), Color.Purple, 20);
                 }
@@ -326,7 +326,7 @@ public class EnhancementUI
                 {
                     protectedItem = true;
                     _targetItem.Downgrade(); // Seviye düşür
-                    _resultMessage = "BASARISIZ (SEVIYE DUSTU)";
+                    _resultMessage = "BAŞARISIZ (SEVİYE DÜŞTÜ)";
                     _resultColor = Color.Orange;
                     CreateParticles(_windowBounds.Center.ToVector2(), Color.Gray, 20);
                 }
@@ -335,7 +335,7 @@ public class EnhancementUI
             if (!protectedItem)
             {
                 // YOK OLDU
-                _resultMessage = "ESYA YOK OLDU!";
+                _resultMessage = "EŞYA YOK OLDU!";
                 _resultColor = Color.Red;
                 _inventory.RemoveItemInstance(_targetItem); // SİL
                 CreateParticles(_windowBounds.Center.ToVector2(), Color.Black, 50);
@@ -411,7 +411,7 @@ public class EnhancementUI
         spriteBatch.Draw(_pixelTexture, headerBar, new Color(45, 48, 65));
         DrawBorder(spriteBatch, headerBar, 1, new Color(200, 180, 120, 100));
 
-        string title = "ESYA GUCLENDIRME";
+        string title = "EŞYA GÜÇLENDİRME";
         Vector2 titleSize = font.MeasureString(title) * 0.9f;
         spriteBatch.DrawString(font, title, new Vector2(_windowBounds.Center.X - titleSize.X/2, _windowBounds.Y + 12), new Color(255, 230, 150), 0f, Vector2.Zero, 0.9f, SpriteEffects.None, 0);
         
@@ -465,7 +465,7 @@ public class EnhancementUI
         if (_targetItem.Type == ItemType.Weapon)
         {
             stats.Add(("Hasar", $"{_targetItem.MinDamage}-{_targetItem.MaxDamage}", $"{_nextLevelItem.MinDamage}-{_nextLevelItem.MaxDamage}"));
-            stats.Add(("Hiz", _targetItem.AttackSpeed.ToString(), _nextLevelItem.AttackSpeed.ToString()));
+            stats.Add(("Hız", _targetItem.AttackSpeed.ToString(), _nextLevelItem.AttackSpeed.ToString()));
         }
         else if (_targetItem.Type == ItemType.Armor || _targetItem.Type == ItemType.Helmet)
         {
@@ -510,7 +510,7 @@ public class EnhancementUI
         spriteBatch.Draw(_pixelTexture, costBox, new Color(20, 22, 30, 150));
         DrawBorder(spriteBatch, costBox, 1, Color.White * 0.1f);
 
-        string stoneReq = $"Gereken Tas: {_costStones} (Sende: {_inventory.GetItemCount(99)})";
+        string stoneReq = $"Gereken Taş: {_costStones} (Sende: {_inventory.GetItemCount(99)})";
         string goldReq = $"Gereken Altın: {_costGold} (Sende: {_player.Gold})";
         
         Color stoneCol = _inventory.GetItemCount(99) >= _costStones ? Color.White : Color.Red;
@@ -538,7 +538,7 @@ public class EnhancementUI
                 DrawDivineEffect(spriteBatch, _charmSlotRect);
             }
 
-            string label = _selectedCharm.Id switch { 20 => "+%10", 21 => "+%25", 22 => "+%50", 32 => "ILAHI", _ => "" };
+            string label = _selectedCharm.Id switch { 20 => "+%10", 21 => "+%25", 22 => "+%50", 32 => "İLAHİ", _ => "" };
             Vector2 sz = font.MeasureString(label) * 0.7f;
             spriteBatch.DrawString(font, label, new Vector2(_charmSlotRect.Center.X - sz.X/2, _charmSlotRect.Bottom + 4), Color.Cyan, 0, Vector2.Zero, 0.7f, SpriteEffects.None, 0);
         }
@@ -582,7 +582,7 @@ public class EnhancementUI
              else if (_selectedCharm.Id == 22) totalChance += 50;
         }
         
-        string chanceText = $"Basarı Sansı: %{(totalChance > 100 ? 100 : totalChance):0.#}";
+        string chanceText = $"Başarı Şansı: %{(totalChance > 100 ? 100 : totalChance):0.#}";
         Vector2 chanceSz = font.MeasureString(chanceText) * 0.9f;
         spriteBatch.DrawString(font, chanceText, new Vector2(_windowBounds.Center.X - chanceSz.X/2, bottomY), totalChance >= 50 ? Color.Lime : Color.Gold, 0, Vector2.Zero, 0.9f, SpriteEffects.None, 0);
 
@@ -593,7 +593,7 @@ public class EnhancementUI
             spriteBatch.Draw(_pixelTexture, _buttonRect, btnColor);
             DrawBorder(spriteBatch, _buttonRect, 1, Color.Lime * 0.4f);
             
-            string btnText = "YUKSELT";
+            string btnText = "YÜKSELT";
             Vector2 btnSz = font.MeasureString(btnText);
             spriteBatch.DrawString(font, btnText, _buttonRect.Center.ToVector2() - btnSz/2, Color.White);
         }

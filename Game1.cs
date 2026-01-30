@@ -368,7 +368,7 @@ public partial class Game1 : Game
                 _gameLog.AddMessage($"+{xpAmount} XP", Color.Cyan);
                 
                 // Altın Popup yerine Log
-                _gameLog.AddMessage($"+{goldAmount} Altin", Color.Gold);
+                _gameLog.AddMessage($"+{goldAmount} Altın", Color.Gold);
                 
                 // === LOOT DROP ===
                 var drops = LootManager.GetLoot(enemy.Type);
@@ -380,7 +380,7 @@ public partial class Game1 : Game
                         Item itemDrop = ItemDatabase.GetItem(drop.ItemId);
                         
                         // Drop bildirimi
-                        _gameLog.AddMessage($"Kazanildi: {itemDrop.Name}", itemDrop.GetRarityColor());
+                        _gameLog.AddMessage($"Kazanıldı: {itemDrop.Name}", itemDrop.GetRarityColor());
                     }
                 }
             }
@@ -1182,7 +1182,7 @@ public partial class Game1 : Game
                 _currentState = GameState.Playing;
             });
             
-            DrawButton("CIKIS", 140, Color.IndianRed, Color.Red, () => {
+            DrawButton("ÇIKIŞ", 140, Color.IndianRed, Color.Red, () => {
                 Exit();
             });
             
@@ -1231,8 +1231,8 @@ public partial class Game1 : Game
                 }
             }
             
-            DrawSlider("MUZIK SESI", sliderX, musicSliderY, _musicManager.MasterVolume, true);
-            DrawSlider("SES EFEKTLERI", sliderX, sfxSliderY, _sfxVolume, false);
+            DrawSlider("MÜZİK SESİ", sliderX, musicSliderY, _musicManager.MasterVolume, true);
+            DrawSlider("SES EFEKTLERİ", sliderX, sfxSliderY, _sfxVolume, false);
         }
         
         if (_currentState == GameState.Dead)
@@ -1327,12 +1327,12 @@ public partial class Game1 : Game
         _skillBarUI.Draw(_spriteBatch, _gameFont);
         
         // Map Bilgisi (Sağ Üst)
-        string mapText = $"Bolge: {_currentMapIndex}";
-        if (_currentMapIndex == 1) mapText += " (Guvenli)";
+        string mapText = $"Bölge: {_currentMapIndex}";
+        if (_currentMapIndex == 1) mapText += " (Güvenli)";
         else if (_currentMapIndex == 2) mapText += " (Goblin)";
-        else if (_currentMapIndex == 3) mapText += " (Orumcek)";
-        else if (_currentMapIndex == 4) mapText += " (Iskelet)";
-        else if (_currentMapIndex == 5) mapText += " (Seytan)";
+        else if (_currentMapIndex == 3) mapText += " (Örümcek)";
+        else if (_currentMapIndex == 4) mapText += " (İskelet)";
+        else if (_currentMapIndex == 5) mapText += " (Şeytan)";
         
         Vector2 mapSize = _gameFont.MeasureString(mapText);
         _spriteBatch.DrawString(_gameFont, mapText, 
@@ -1359,7 +1359,7 @@ public partial class Game1 : Game
             _player.Center + new Vector2(0, -60),
             _pendingDeathPenalty,
             Color.Red
-        ) { CustomText = $"OLDUN! -{_pendingDeathPenalty} Gold" });
+        ) { CustomText = $"ÖLDÜN! -{_pendingDeathPenalty} Gold" });
     }
     
     private Texture2D CreateVendorTexture(GraphicsDevice gd)
