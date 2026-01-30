@@ -11,7 +11,8 @@ public enum GameState
 {
     Login,
     Playing,
-    Paused
+    Paused,
+    Dead
 }
 
 public partial class Game1 : Game
@@ -105,6 +106,9 @@ public partial class Game1 : Game
     private Rectangle _statsButtonRect;
     private bool _isHoveringStats;
     private Texture2D _statsIconTexture;
+    
+    // Revive UI
+    private ReviveUI _reviveUI;
     
 
 
@@ -476,9 +480,11 @@ public partial class Game1 : Game
             // ÖLÜM KONTROLÜ
             if (_player.CurrentHealth <= 0)
             {
-                // İşlemi hemen yapma, bayrağı kaldır (Update başında yapacağız)
-                _pendingDeathPenalty = (int)(_player.Gold * 0.10f);
-                _playerNeedsRespawn = true;
+                // Can't die if already dead
+                if (_currentState == GameState.Dead) return;
+                
+                _currentState = GameState.Dead;
+                _reviveUI.Open(_player);
             }
         };
         
@@ -537,6 +543,52 @@ public partial class Game1 : Game
         // Player SFX
         Player.SfxCoinPickup = _sfxCoinPickup;
         
+        // Revive UI
+        _reviveUI = new ReviveUI(GraphicsDevice, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+        
+        _reviveUI.OnReviveClicked += () => 
+        {
+            // Remove Gold
+            int cost = _reviveUI.GetCost();
+            _player.LoseGold(cost);
+            
+            // Full Heal
+            _player.CurrentHealth = _player.MaxHealth;
+            
+            // Continue Playing
+            _currentState = GameState.Playing;
+            
+            // Effect
+            _damageNumbers.Add(new DamageNumber(
+                _player.Center + new Vector2(0, -60),
+                0,
+                Color.Green
+            ) { CustomText = $"-{cost} Altin" });
+        };
+        
+        _reviveUI.OnTownClicked += () =>
+        {
+            // Remove Gold (Town Penalty)
+            int cost = _reviveUI.GetTownCost();
+            _player.LoseGold(cost);
+            
+            // Full Heal
+            _player.CurrentHealth = _player.MaxHealth;
+            
+            // Teleport to Town
+            LoadMap(1);
+            _player.SetPosition(new Vector2(MAP_WIDTH / 2f - 24, MAP_HEIGHT / 2f - 32));
+            
+            _currentState = GameState.Playing;
+            
+             // Effect
+            _damageNumbers.Add(new DamageNumber(
+                _player.Center + new Vector2(0, -60),
+                0,
+                Color.Green
+            ) { CustomText = $"-{cost} Altin" });
+        };
+
         LoadMap(1);
         
 
@@ -705,6 +757,17 @@ public partial class Game1 : Game
             return;
         }
 
+        if (_currentState == GameState.Dead)
+        {
+            IsMouseVisible = true;
+            _player.StopMoving();
+            _reviveUI.Update(gameTime, currentMouseState);
+            
+            _previousKeyState = currentKeyState;
+            base.Update(gameTime);
+            return;
+        }
+
         // --- GAME PLAYING ---
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
@@ -750,6 +813,7 @@ public partial class Game1 : Game
             // F tuşu ile satıcıyı aç
             if (_nearVendor && currentKeyState.IsKeyDown(Keys.F) && !_previousKeyState.IsKeyDown(Keys.F))
             {
+                _player.StopMoving();
                 _shopUI.Open(_player, _inventory);
             }
         }
@@ -1051,6 +1115,13 @@ public partial class Game1 : Game
             _spriteBatch.DrawString(_gameFont, volHint, 
                 new Vector2((GraphicsDevice.Viewport.Width - hintSize.X) / 2, volPos.Y + 25), 
                 Color.Gray, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
+        }
+        
+        if (_currentState == GameState.Dead)
+        {
+            // Oyuncu öldüğünde de stat barı görünsün (belki)
+            // Ama Revive UI en üstte olmalı
+            _reviveUI.Draw(_spriteBatch, _gameFont);
         }
         
         if (_showStats)

@@ -1192,8 +1192,8 @@ public class Inventory
         if (item == null) return false;
         
         // 1. Önce mevcutları kontrol et (Stacking)
-        // Sadece Materials (Malzemeler) ve +0 items birleşebilir. Ekipmanlar birleşmez.
-        if (item.Type == ItemType.Material && item.EnhancementLevel == 0)
+        // Sadece Materials (Malzemeler) ve Consumables (Tüketilebilir) birleşebilir.
+        if ((item.Type == ItemType.Material || item.Type == ItemType.Consumable) && item.EnhancementLevel == 0)
         {
             for (int p = 0; p < PAGE_COUNT; p++)
             {
