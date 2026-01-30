@@ -38,6 +38,9 @@ namespace EternalJourney
 
         public void LoadContent(ContentManager content)
         {
+            // Title Music
+            _tracks[0] = content.Load<SoundEffect>("SFX/bg_main");
+            
             // Map 1: bg_2 (Başlangıç)
             _tracks[1] = content.Load<SoundEffect>("SFX/bg_2");
             
@@ -71,7 +74,8 @@ namespace EternalJourney
             // Yeni mape geçişte hemen başlama, FadeIn ile başla
             if (_tracks.ContainsKey(mapIndex))
             {
-                StartTrack(_tracks[mapIndex]);
+                // Title (0) loop çalmalı, diğerleri değil
+                StartTrack(_tracks[mapIndex], mapIndex == 0);
             }
             else
             {
@@ -79,11 +83,11 @@ namespace EternalJourney
             }
         }
 
-        private void StartTrack(SoundEffect effect)
+        private void StartTrack(SoundEffect effect, bool isLooped = false)
         {
             _currentInstance = effect.CreateInstance();
             _currentInstance.Volume = 0f;
-            _currentInstance.IsLooped = false; // Loop kapalı, biz yöneteceğiz
+            _currentInstance.IsLooped = isLooped;
             _currentInstance.Play();
 
             _state = MusicState.FadingIn;
@@ -151,6 +155,13 @@ namespace EternalJourney
             }
         }
         
+        public void SetVolume(float volume)
+        {
+            MasterVolume = Math.Clamp(volume, 0.0f, 1.0f);
+            if (_currentInstance != null)
+                _currentInstance.Volume = MasterVolume;
+        }
+
         public void Stop()
         {
             if (_currentInstance != null)

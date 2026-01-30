@@ -100,12 +100,19 @@ public partial class Game1 : Game
     private SoundEffect _sfxCoinBuy;
     private SoundEffect _sfxCoinSell;
     private SoundEffect _sfxCoinDrop;
+    private SoundEffect _sfxUpgradeSuccess;
+    
+    // Volume Settings
+    private float _sfxVolume = 0.5f;
+    private bool _isDraggingMusic;
+    private bool _isDraggingSFX;
     
     // Mobile UI (Removed Joystick)
     // private VirtualJoystick _joystick;
     private Rectangle _statsButtonRect;
     private bool _isHoveringStats;
     private Texture2D _statsIconTexture;
+    private Texture2D _goldIconTexture;
     
     // Revive UI
     private ReviveUI _reviveUI;
@@ -159,7 +166,9 @@ public partial class Game1 : Game
              _player.Experience = 0;
              _player.Level = 1;
              _player.Gold = 0;
-        }
+             
+             LoadMap(1);
+         }
         else
         {
             // --- KAYITLI OYUN YÜKLE ---
@@ -171,7 +180,7 @@ public partial class Game1 : Game
                  _player.MaxHealth = data.MaxHealth;
                  _player.Level = data.Level;
                  _player.GainExperience((int)data.Experience);
-                 _player.GainGold(data.Gold);
+                 _player.GainGold(data.Gold, true);
                  
                  // 1. Önce Map'i yükle
                  _currentMapIndex = data.MapIndex;
@@ -379,11 +388,11 @@ public partial class Game1 : Game
         };
         
         // Item veritabanını başlat
-        ItemDatabase.Initialize(GraphicsDevice);
+        ItemDatabase.Initialize(GraphicsDevice, Content);
         LootManager.Initialize(); // Loot tablolarını yükle
         
         // Envanter oluştur
-        _inventory = new Inventory(GraphicsDevice, 
+        _inventory = new Inventory(GraphicsDevice, Content,
             GraphicsDevice.Viewport.Width, 
             GraphicsDevice.Viewport.Height);
         _inventory.SetPlayer(_player);
@@ -489,7 +498,6 @@ public partial class Game1 : Game
         };
         
         // İlk Haritayı Yükle
-        // İlk Haritayı Yükle - MusicManager yüklendikten sonra çağrılacak
         // LoadMap(1);
         
         // Çanta Butonu Oluştur (Sağ Alt)
@@ -500,7 +508,19 @@ public partial class Game1 : Game
             bagSize, bagSize
         );
         
-        _bagButtonTexture = CreateBagIcon(GraphicsDevice, bagSize);
+        // UI Textures
+        try { 
+            _bagButtonTexture = Content.Load<Texture2D>("icons/inventory"); 
+            _statsIconTexture = Content.Load<Texture2D>("icons/stats");
+            _goldIconTexture = Content.Load<Texture2D>("icons/gold");
+        } 
+        catch 
+        {
+            // Fallbacks if not found
+             _bagButtonTexture = CreateBagIcon(GraphicsDevice, 64);
+             _statsIconTexture = CreateStatsIcon(GraphicsDevice, 64);
+             _goldIconTexture = CreateBagIcon(GraphicsDevice, 32); 
+        }
         
         // Title Screen
         _titleScreen = new TitleScreen(GraphicsDevice, 
@@ -512,6 +532,7 @@ public partial class Game1 : Game
         // Music Manager
         _musicManager = new MusicManager();
         _musicManager.LoadContent(Content);
+        _musicManager.PlayMusicForMap(0); // Title Music
         
         // Skill System Init
         _player.InitializeSkills(GraphicsDevice);
@@ -522,10 +543,8 @@ public partial class Game1 : Game
             _graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight);
             
         // Mobile UI Init
-        // _joystick = new VirtualJoystick(GraphicsDevice, new Vector2(150, _graphics.PreferredBackBufferHeight - 150), 80);
         _statsButtonRect = new Rectangle(_graphics.PreferredBackBufferWidth - 100, _graphics.PreferredBackBufferHeight - 180, 64, 64);
-        _statsIconTexture = CreateStatsIcon(GraphicsDevice, 64);
-            
+
         // Load SFX
         _sfxCoinPickup = Content.Load<SoundEffect>("SFX/sfx_coin_pickup");
         _sfxCoinBuy = Content.Load<SoundEffect>("SFX/sfx_coin_buy");
@@ -534,6 +553,11 @@ public partial class Game1 : Game
         
         _inventory.SetCoinSounds(_sfxCoinPickup, _sfxCoinBuy, _sfxCoinSell, _sfxCoinDrop);
         _shopUI.SetCoinSounds(_sfxCoinBuy, _sfxCoinSell);
+        
+        try {
+            _sfxUpgradeSuccess = Content.Load<SoundEffect>("SFX/upgrade_succesful");
+            _enhancementUI.SetSFX(_sfxUpgradeSuccess);
+        } catch { }
         
         // Enemy SFX
         Enemy.SfxDemonIdle = Content.Load<SoundEffect>("SFX/devil_sound");
@@ -593,10 +617,8 @@ public partial class Game1 : Game
         };
 
         LoadMap(1);
-        
+    } // End LoadContent    
 
-    }
-    
     private Texture2D CreateBagIcon(GraphicsDevice graphicsDevice, int size)
     {
         Texture2D texture = new Texture2D(graphicsDevice, size, size);
@@ -641,8 +663,11 @@ public partial class Game1 : Game
         _enemyManager.ClearGroups();
         _damageNumbers.Clear();
         
-        // Müzik Değiştir
-        _musicManager.PlayMusicForMap(mapIndex);
+        // Müzik Değiştir - Eğer Login ekranındaysak müziği değiştirme (bg_main çalmaya devam etsin)
+        if (_currentState != GameState.Login)
+        {
+            _musicManager.PlayMusicForMap(mapIndex);
+        }
         
         // Arka Plan Texture'ını map'e göre oluştur
         _backgroundTexture = CreateDungeonFloor(mapIndex);
@@ -729,6 +754,9 @@ public partial class Game1 : Game
         
         if (_currentState == GameState.Login)
         {
+            // Müzik yöneticisini güncelle (FadeIn/FadeOut çalışması için)
+            _musicManager.Update(gameTime);
+            
             IsMouseVisible = true;
             _titleScreen.Update(gameTime, currentMouseState, currentKeyState);
             
@@ -743,26 +771,25 @@ public partial class Game1 : Game
             IsMouseVisible = true;
             _player.StopMoving();
             
-            // Resume
+            // Mouse logic handled in Draw/UI section or here?
+            // Actually, for simple buttons, handling clicks in Draw is easiest for Immediate Mode GUI
+            // But we should ideally separate Update/Draw.
+            // For now, let's just keep the state updates here minimal and rely on Draw's immediate mode logic 
+            // OR move button logic here. 
+            // Since I implemented the click logic in Draw(), I don't need update logic here for buttons.
+            
+            // Just Escape key to Unpause is convenient to keep? 
+            // User requested "butonlu yapıya geçir ... klavye tuşları değil".
+            // So removing keyboard unpause.
+            
             if (currentKeyState.IsKeyDown(Keys.Escape) && !_previousKeyState.IsKeyDown(Keys.Escape))
             {
-                _currentState = GameState.Playing;
-                IsMouseVisible = !_graphics.IsFullScreen;
-            }
-            // Exit
-            else if (currentKeyState.IsKeyDown(Keys.Enter) && !_previousKeyState.IsKeyDown(Keys.Enter))
-            {
-                SaveCurrentGame();
-                Exit();
-            }
-            // Volume Control
-            else if (currentKeyState.IsKeyDown(Keys.Up) && !_previousKeyState.IsKeyDown(Keys.Up))
-            {
-                _musicManager.IncreaseVolume();
-            }
-            else if (currentKeyState.IsKeyDown(Keys.Down) && !_previousKeyState.IsKeyDown(Keys.Down))
-            {
-                _musicManager.DecreaseVolume();
+                 // Optional: Keep ESC to toggle back to game as a standard usage?
+                 // User said "ESC menüsünü butonlu yapıya geçirmeni istiyorum klavye tuşları değil."
+                 // This implies interaction with the menu items. 
+                 // Toggling the menu ON/OFF with ESC is standard. 
+                 _currentState = GameState.Playing;
+                 IsMouseVisible = !_graphics.IsFullScreen;
             }
             
             _previousKeyState = currentKeyState;
@@ -1083,8 +1110,8 @@ public partial class Game1 : Game
             {
                 Color bagTint = _isHoveringBag ? Color.White : new Color(220, 220, 220);
                 _spriteBatch.Draw(_bagButtonTexture, _bagButtonRect, bagTint);
-                // Tuş ipucu
-                 _spriteBatch.DrawString(_gameFont, "[I]", new Vector2(_bagButtonRect.X, _bagButtonRect.Y - 20), Color.White);
+                // Tuş ipucu (Visual Icon kullanıldığı için "I" yazısına gerek olmayabilir ama kalsın)
+                 // _spriteBatch.DrawString(_gameFont, "[I]", new Vector2(_bagButtonRect.X, _bagButtonRect.Y - 20), Color.White);
             }
         }
         
@@ -1098,37 +1125,106 @@ public partial class Game1 : Game
             Vector2 titleSize = _gameFont.MeasureString(title);
             Vector2 titlePos = new Vector2(
                 (GraphicsDevice.Viewport.Width - titleSize.X) / 2, 
-                GraphicsDevice.Viewport.Height / 2 - 50
+                GraphicsDevice.Viewport.Height / 2 - 100
             );
             
             _spriteBatch.DrawString(_gameFont, title, titlePos + new Vector2(2, 2), Color.Black);
             _spriteBatch.DrawString(_gameFont, title, titlePos, Color.Gold);
             
-            // Seçenekler
-            string resumeText = "[ESC] Devam Et";
-            string exitText = "[ENTER] Cikis";
+            // Mouse Durumu
+            MouseState ms = Mouse.GetState();
+            Rectangle mouseRect = new Rectangle(ms.X, ms.Y, 1, 1);
             
-            Vector2 resumeSize = _gameFont.MeasureString(resumeText);
-            Vector2 exitSize = _gameFont.MeasureString(exitText);
+            // Button Helper
+            void DrawButton(string text, int yOffset, Color baseColor, Color hoverColor, Action onClick)
+            {
+                Vector2 size = _gameFont.MeasureString(text);
+                Rectangle btnRect = new Rectangle(
+                    (int)((GraphicsDevice.Viewport.Width - size.X) / 2) - 10,
+                    (int)(titlePos.Y + yOffset),
+                    (int)size.X + 20,
+                    (int)size.Y + 10
+                );
+                
+                bool isHover = btnRect.Intersects(mouseRect);
+                
+                // Arkaplan
+                _spriteBatch.Draw(_pixelTexture, btnRect, isHover ? Color.DarkGray * 0.5f : Color.Black * 0.5f);
+                
+                // Çerçeve
+                if (isHover) 
+                {
+                    _spriteBatch.Draw(_pixelTexture, new Rectangle(btnRect.X, btnRect.Y, btnRect.Width, 2), Color.Gold);
+                    _spriteBatch.Draw(_pixelTexture, new Rectangle(btnRect.X, btnRect.Bottom, btnRect.Width, 2), Color.Gold);
+                    _spriteBatch.Draw(_pixelTexture, new Rectangle(btnRect.X, btnRect.Y, 2, btnRect.Height), Color.Gold);
+                    _spriteBatch.Draw(_pixelTexture, new Rectangle(btnRect.Right, btnRect.Y, 2, btnRect.Height + 2), Color.Gold);
+                }
+                
+                // Text
+                _spriteBatch.DrawString(_gameFont, text, new Vector2(btnRect.X + 10, btnRect.Y + 5), isHover ? hoverColor : baseColor);
+                
+                // Click
+                if (isHover && ms.LeftButton == ButtonState.Pressed && _previousMouseState.LeftButton == ButtonState.Released)
+                {
+                    onClick?.Invoke();
+                }
+            }
             
-            Vector2 resumePos = new Vector2((GraphicsDevice.Viewport.Width - resumeSize.X) / 2, titlePos.Y + 60);
-            Vector2 exitPos = new Vector2((GraphicsDevice.Viewport.Width - exitSize.X) / 2, resumePos.Y + 40);
+            DrawButton("DEVAM ET", 80, Color.White, Color.Lime, () => {
+                _currentState = GameState.Playing;
+            });
             
-            _spriteBatch.DrawString(_gameFont, resumeText, resumePos, Color.White);
-            _spriteBatch.DrawString(_gameFont, exitText, exitPos, Color.IndianRed);
+            DrawButton("CIKIS", 140, Color.IndianRed, Color.Red, () => {
+                Exit();
+            });
             
-            // Volume Display
-            string volText = $"Muzik Sesi: %{(int)(_musicManager.MasterVolume * 100)}";
-            Vector2 volSize = _gameFont.MeasureString(volText);
-            Vector2 volPos = new Vector2((GraphicsDevice.Viewport.Width - volSize.X) / 2, exitPos.Y + 50);
+            // --- VOLUME SLIDERS ---
+            int sliderW = 200;
+            int sliderH = 10;
+            int sliderX = (GraphicsDevice.Viewport.Width - sliderW) / 2;
+            int musicSliderY = (int)titlePos.Y + 200;
+            int sfxSliderY = (int)titlePos.Y + 260;
             
-            _spriteBatch.DrawString(_gameFont, volText, volPos, Color.LightGreen);
+            void DrawSlider(string label, int x, int y, float volume, bool isMusic)
+            {
+                Rectangle barRect = new Rectangle(x, y, sliderW, sliderH);
+                Rectangle knobRect = new Rectangle(x + (int)(volume * sliderW) - 5, y - 5, 10, 20);
+                
+                // Label
+                _spriteBatch.DrawString(_gameFont, $"{label}: %{(int)(volume * 100)}", new Vector2(x, y - 25), Color.LightGray, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
+                
+                // Bar
+                _spriteBatch.Draw(_pixelTexture, barRect, Color.Gray * 0.5f);
+                
+                // Knob
+                bool isHover = knobRect.Contains(ms.X, ms.Y) || barRect.Contains(ms.X, ms.Y);
+                _spriteBatch.Draw(_pixelTexture, knobRect, isHover ? Color.Gold : Color.White);
+                
+                // Drag Logic
+                if (ms.LeftButton == ButtonState.Pressed)
+                {
+                    if (isMusic && (_isDraggingMusic || barRect.Contains(ms.X, ms.Y)))
+                    {
+                        _isDraggingMusic = true;
+                        float newVol = Math.Clamp((float)(ms.X - x) / sliderW, 0f, 1f);
+                        _musicManager.SetVolume(newVol);
+                    }
+                    else if (!isMusic && (_isDraggingSFX || barRect.Contains(ms.X, ms.Y)))
+                    {
+                        _isDraggingSFX = true;
+                        _sfxVolume = Math.Clamp((float)(ms.X - x) / sliderW, 0f, 1f);
+                        SoundEffect.MasterVolume = _sfxVolume;
+                    }
+                }
+                else
+                {
+                    if (isMusic) _isDraggingMusic = false;
+                    else _isDraggingSFX = false;
+                }
+            }
             
-            string volHint = "[YUKARI/ASAGI] Ayarla";
-            Vector2 hintSize = _gameFont.MeasureString(volHint);
-            _spriteBatch.DrawString(_gameFont, volHint, 
-                new Vector2((GraphicsDevice.Viewport.Width - hintSize.X) / 2, volPos.Y + 25), 
-                Color.Gray, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
+            DrawSlider("MUZIK SESI", sliderX, musicSliderY, _musicManager.MasterVolume, true);
+            DrawSlider("SES EFEKTLERI", sliderX, sfxSliderY, _sfxVolume, false);
         }
         
         if (_currentState == GameState.Dead)
@@ -1195,11 +1291,29 @@ public partial class Game1 : Game
         string levelText = $"Lvl {_player.Level}";
         _spriteBatch.DrawString(_gameFont, levelText, new Vector2(barX + barWidth + 10, barY + 5), new Color(255, 200, 50));
         
-        // --- ALTIN ---
-        // Sol üst köşe, can barının üstü veya yanı
-        // Sol üst köşe, can barının üstü veya yanı
-        string goldText = $"{_player.Gold} G";
-        _spriteBatch.DrawString(_gameFont, goldText, new Vector2(barX, barY + xpBarHeight + 35), Color.Gold);
+        // --- ALTIN (Updated with Icon) ---
+        string goldText = $"{_player.Gold}";
+        Vector2 goldSz = _gameFont.MeasureString(goldText);
+        Vector2 goldPos = new Vector2(barX + 35, barY + xpBarHeight + 35); // Icon width added
+        
+        if (_goldIconTexture != null)
+        {
+            // En boy oranını koruyarak çiz (basık görünmemesi için)
+            float iconHeight = 24f;
+            float aspectRatio = (float)_goldIconTexture.Width / _goldIconTexture.Height;
+            int drawWidth = (int)(iconHeight * aspectRatio);
+            
+            _spriteBatch.Draw(_goldIconTexture, new Rectangle(barX, (int)goldPos.Y - 2, drawWidth, (int)iconHeight), Color.White);
+            
+            // Metin pozisyonunu ikona göre ayarla
+            goldPos.X = barX + drawWidth + 8;
+        }
+        else 
+        {
+            _spriteBatch.DrawString(_gameFont, "G:", new Vector2(barX, goldPos.Y), Color.Gold);
+        }
+        
+        _spriteBatch.DrawString(_gameFont, goldText, goldPos + new Vector2(0, -2), Color.Gold);
         
         // Skill Bar
         _skillBarUI.Draw(_spriteBatch, _gameFont);
@@ -1216,6 +1330,8 @@ public partial class Game1 : Game
         _spriteBatch.DrawString(_gameFont, mapText, 
             new Vector2(_graphics.PreferredBackBufferWidth - mapSize.X - 20, 20), 
             Color.LightGray);
+            
+         // Gold (Sağ Üstte de olabilir ama sol üstte HP barın altında daha iyi)
     }
     
     private void HandlePlayerDeath()

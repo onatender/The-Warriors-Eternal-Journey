@@ -141,7 +141,7 @@ public class Inventory
         return null;
     }
     
-    public Inventory(GraphicsDevice graphicsDevice, int screenWidth, int screenHeight)
+    public Inventory(GraphicsDevice graphicsDevice, Microsoft.Xna.Framework.Content.ContentManager content, int screenWidth, int screenHeight)
     {
         _screenWidth = screenWidth;
         _screenHeight = screenHeight;
@@ -160,10 +160,10 @@ public class Inventory
         }
         
         // Item database'i initialize et
-        ItemDatabase.Initialize(graphicsDevice);
+        ItemDatabase.Initialize(graphicsDevice, content);
         
         // Texture'ları oluştur
-        CreateTextures(graphicsDevice);
+        CreateTextures(graphicsDevice, content);
         
         // Pozisyonu hesapla (ekranın ortası)
         CalculatePosition();
@@ -172,7 +172,7 @@ public class Inventory
         // AddItem(1, 1);
     }
     
-    private void CreateTextures(GraphicsDevice graphicsDevice)
+    private void CreateTextures(GraphicsDevice graphicsDevice, Microsoft.Xna.Framework.Content.ContentManager content)
     {
         // Normal slot texture
         _slotTexture = new Texture2D(graphicsDevice, SLOT_SIZE, SLOT_SIZE);
@@ -292,17 +292,17 @@ public class Inventory
         }
         _pageButtonTexture.SetData(btnColors);
         
-        // Weapon slot icon (kılıç silüeti)
-        _weaponSlotIcon = CreateWeaponSlotIcon(graphicsDevice);
+        // Weapon slot icon (kılıç silüeti) - Real sprite if possible
+        try { _weaponSlotIcon = content.Load<Texture2D>("icons/sword_1"); } catch { _weaponSlotIcon = CreateWeaponSlotIcon(graphicsDevice); }
         
         // Armor slot icon (zırh silüeti)
-        _armorSlotIcon = CreateArmorSlotIcon(graphicsDevice);
+        try { _armorSlotIcon = content.Load<Texture2D>("icons/chestplate_1"); } catch { _armorSlotIcon = CreateArmorSlotIcon(graphicsDevice); }
         
         // Shield slot icon (kalkan silüeti)
-        _shieldSlotIcon = CreateShieldSlotIcon(graphicsDevice);
+        try { _shieldSlotIcon = content.Load<Texture2D>("icons/shield_1"); } catch { _shieldSlotIcon = CreateShieldSlotIcon(graphicsDevice); }
         
         // Helmet slot icon (kask silüeti)
-        _helmetSlotIcon = CreateHelmetSlotIcon(graphicsDevice);
+        try { _helmetSlotIcon = content.Load<Texture2D>("icons/helmet_1"); } catch { _helmetSlotIcon = CreateHelmetSlotIcon(graphicsDevice); }
     }
     
     private Texture2D CreateWeaponSlotIcon(GraphicsDevice graphicsDevice)
@@ -1170,9 +1170,9 @@ public class Inventory
         
         if (slot.IsEmpty)
         {
-            // Boş slot ikonu
+            // Boş slot ikonu - Tinted ghost effect
             Rectangle iconRect = new Rectangle(rect.X + 5, rect.Y + 5, 50, 50);
-            spriteBatch.Draw(emptyIcon, iconRect, new Color(255, 255, 255, 100));
+            spriteBatch.Draw(emptyIcon, iconRect, new Color(10, 10, 10, 140));
         }
         else if (slot.Item?.Icon != null)
         {

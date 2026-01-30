@@ -236,9 +236,9 @@ public class ShopUI
         );
     }
     
-    private List<(int page, int y, int x, Item item)> GetPlayerItems()
+    private List<(int page, int y, int x, Item item, int quantity)> GetPlayerItems()
     {
-        var items = new List<(int, int, int, Item)>();
+        var items = new List<(int, int, int, Item, int)>();
         
         for (int p = 0; p < 4; p++)
         {
@@ -249,7 +249,7 @@ public class ShopUI
                     var slot = _inventory.GetSlot(p, py, px);
                     if (slot != null && !slot.IsEmpty && slot.Item != null)
                     {
-                        items.Add((p, py, px, slot.Item));
+                        items.Add((p, py, px, slot.Item, slot.Quantity));
                     }
                 }
             }
@@ -273,7 +273,7 @@ public class ShopUI
         }
     }
     
-    private void SellItem((int page, int y, int x, Item item) sellInfo)
+    private void SellItem((int page, int y, int x, Item item, int quantity) sellInfo)
     {
         if (sellInfo.item == null) return;
         
@@ -334,6 +334,16 @@ public class ShopUI
                     new Rectangle(slotRect.X + 5, slotRect.Y + 5, SLOT_SIZE - 10, SLOT_SIZE - 10),
                     itemInfo.item.GetRarityColor());
             }
+
+            // Adet Göster
+            if (itemInfo.quantity > 1)
+            {
+                string qtyText = itemInfo.quantity.ToString();
+                Vector2 qtySize = font.MeasureString(qtyText) * 0.6f;
+                Vector2 qtyPos = new Vector2(slotRect.X + 4, slotRect.Bottom - qtySize.Y - 2);
+                spriteBatch.DrawString(font, qtyText, qtyPos + new Vector2(1, 1), Color.Black, 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
+                spriteBatch.DrawString(font, qtyText, qtyPos, Color.White, 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
+            }
             
             // Satış fiyatı göster (hover'da)
             if (isHovered)
@@ -341,7 +351,7 @@ public class ShopUI
                 string price = $"+{itemInfo.item.SellPrice}G";
                 Vector2 priceSize = font.MeasureString(price) * 0.6f;
                 spriteBatch.DrawString(font, price, 
-                    new Vector2(slotRect.Right - priceSize.X - 2, slotRect.Bottom - 12),
+                    new Vector2(slotRect.Right - priceSize.X - 2, slotRect.Bottom - priceSize.Y - 2),
                     Color.LightGreen, 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
             }
         }

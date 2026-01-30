@@ -156,11 +156,40 @@ public static class ItemDatabase
     private static Item[] _items;
     private static bool _initialized = false;
     
-    public static void Initialize(GraphicsDevice graphicsDevice)
+    public static void Initialize(GraphicsDevice graphicsDevice, Microsoft.Xna.Framework.Content.ContentManager content)
     {
         if (_initialized) return;
         
         _items = new Item[100]; // Max 100 farklı item
+        
+        // --- LOAD TEXTURES ---
+        Texture2D armor1 = null, armor2 = null;
+        Texture2D helmet1 = null, helmet2 = null;
+        Texture2D shield1 = null, shield2 = null;
+        Texture2D amulet = null;
+        Texture2D charm = null;
+        Texture2D sword1 = null, sword2 = null;
+        Texture2D upgradeStone = null;
+        
+        try { armor1 = content.Load<Texture2D>("icons/chestplate_1"); } catch {}
+        try { armor2 = content.Load<Texture2D>("icons/chestplate_2"); } catch {}
+        try { helmet1 = content.Load<Texture2D>("icons/helmet_1"); } catch {}
+        try { helmet2 = content.Load<Texture2D>("icons/helmet_2"); } catch {}
+        try { shield1 = content.Load<Texture2D>("icons/shield_1"); } catch {}
+        try { shield2 = content.Load<Texture2D>("icons/shield_2"); } catch {}
+        try { amulet = content.Load<Texture2D>("icons/amulet"); } catch {}
+        try { charm = content.Load<Texture2D>("icons/charm"); } catch {}
+        try { sword1 = content.Load<Texture2D>("icons/sword_1"); } catch {}
+        try { sword2 = content.Load<Texture2D>("icons/sword_2"); } catch {}
+        try { upgradeStone = content.Load<Texture2D>("icons/upgrade_stone"); } catch {}
+        
+        // Fallbacks (if load fails)
+        if (armor1 == null) armor1 = CreateArmorIcon(graphicsDevice, new Color(150, 120, 90));
+        if (armor2 == null) armor2 = CreateArmorIcon(graphicsDevice, new Color(120, 120, 140));
+        if (helmet1 == null) helmet1 = CreateHelmetIcon(graphicsDevice, new Color(120, 80, 50)); // helmet1 = BROWN (Leather)
+        if (helmet2 == null) helmet2 = CreateHelmetIcon(graphicsDevice, new Color(180, 180, 190)); // helmet2 = GRAY (Iron)
+        if (shield1 == null) shield1 = CreateShieldIcon(graphicsDevice, new Color(180, 180, 190));
+        if (shield2 == null) shield2 = CreateShieldIcon(graphicsDevice, new Color(139, 90, 43));
         
         // ID 1: Tahta Kılıç
         _items[1] = new Item
@@ -177,7 +206,7 @@ public static class ItemDatabase
 
             AttackSpeed = 50,
             BuyPrice = 150, // Rebalance: 50 -> 150
-            Icon = CreateWeaponIcon(graphicsDevice, new Color(139, 90, 43)) // Kahverengi tahta
+            Icon = sword1 ?? CreateWeaponIcon(graphicsDevice, new Color(139, 90, 43)) // sword_1
         };
         
         // ID 2: Kumaş Zırh
@@ -193,7 +222,7 @@ public static class ItemDatabase
             Defense = 5,
             Health = 10,
             BuyPrice = 120, // Rebalance: 40 -> 120
-            Icon = CreateArmorIcon(graphicsDevice, new Color(150, 120, 90))
+            Icon = armor1 // chestplate_1
         };
         
         // ID 3: Deri Zırh
@@ -209,8 +238,11 @@ public static class ItemDatabase
             Defense = 10,
             Health = 20,
             BuyPrice = 400, // Rebalance: New Price
-            Icon = CreateArmorIcon(graphicsDevice, new Color(120, 80, 50)) // Koyu kahve
+            Icon = armor1 // Also chestplate_1 (or use Color filtering in visual if needed, but icon is static)
         };
+        // NOTE: If user wants different colors, we might need a shader or separate textures. 
+        // Or we can Tint it in Draw() using IconColor property!
+        _items[3].IconColor = new Color(200, 150, 100); // Slight tint difference
         
         // ID 99: Güçlendirme Taşı
         _items[99] = new Item
@@ -222,7 +254,7 @@ public static class ItemDatabase
             Rarity = ItemRarity.Rare,
             RequiredLevel = 1,
             BuyPrice = 250, // Rebalance: Enhancement Stone
-            Icon = CreateMaterialIcon(graphicsDevice, Color.Cyan)
+            Icon = upgradeStone ?? CreateMaterialIcon(graphicsDevice, Color.Cyan)
         };
         
         // ID 10: Ebedi Kılıç (Legendary)
@@ -255,10 +287,15 @@ public static class ItemDatabase
             Defense = 50,
             Health = 200,
             BuyPrice = 1000000,
-            Icon = CreateArmorIcon(graphicsDevice, Color.DarkRed)
+            Icon = armor2, // chestplate_2
+            IconColor = Color.Red // Tint Red
         };
 
         // ID 25: Can İksiri
+        Texture2D potionIcon = null;
+        try { potionIcon = content.Load<Texture2D>("icons/health_spell"); }
+        catch { potionIcon = CreatePotionIcon(graphicsDevice, Color.Red); }
+
         _items[25] = new Item
         {
             Id = 25,
@@ -269,13 +306,13 @@ public static class ItemDatabase
             RequiredLevel = 1,
             Health = 50, // Yenilenen can miktarı
             BuyPrice = 500,
-            Icon = CreatePotionIcon(graphicsDevice, Color.Red)
+            Icon = potionIcon
         };
 
         
         // --- EFSUN & SUPPORT ITEMLARI ---
         
-        // ID 20: Şans Tılsımı %10
+        // ID 20: Şans Tılsımı %10 (CHARM)
         _items[20] = new Item
         {
             Id = 20,
@@ -284,7 +321,8 @@ public static class ItemDatabase
             Type = ItemType.Material,
             Rarity = ItemRarity.Common,
             BuyPrice = 300, // Rebalance: +10%
-            Icon = CreateScrollIcon(graphicsDevice, new Color(240, 230, 200), new Color(50, 150, 50)) // Yeşil mühürlü parşömen
+            Icon = charm ?? CreateScrollIcon(graphicsDevice, new Color(240, 230, 200), new Color(50, 150, 50)),
+            IconColor = Color.LightGreen // TINT
         };
         
         // ID 21: Şans Tılsımı %25
@@ -296,7 +334,8 @@ public static class ItemDatabase
             Type = ItemType.Material,
             Rarity = ItemRarity.Rare,
             BuyPrice = 750, // Rebalance: +25%
-            Icon = CreateScrollIcon(graphicsDevice, new Color(255, 250, 220), new Color(50, 50, 150)) // Mavi mühürlü
+            Icon = charm ?? CreateScrollIcon(graphicsDevice, new Color(255, 250, 220), new Color(50, 50, 150)),
+            IconColor = Color.LightBlue // TINT
         };
         
         // ID 22: Şans Tılsımı %50
@@ -308,10 +347,11 @@ public static class ItemDatabase
             Type = ItemType.Material,
             Rarity = ItemRarity.Legendary,
             BuyPrice = 2500, // Rebalance: +50%
-            Icon = CreateScrollIcon(graphicsDevice, new Color(255, 215, 0), new Color(200, 0, 0)) // Altın kağıt, kırmızı mühür
+            Icon = charm ?? CreateScrollIcon(graphicsDevice, new Color(255, 215, 0), new Color(200, 0, 0)),
+            IconColor = Color.Gold // TINT
         };
         
-        // ID 30: Muska
+        // ID 30: Muska (AMULET)
         _items[30] = new Item
         {
             Id = 30,
@@ -320,7 +360,8 @@ public static class ItemDatabase
             Type = ItemType.Material,
             Rarity = ItemRarity.Rare,
             BuyPrice = 1500, // Rebalance: Amulet
-            Icon = CreateAmuletIcon(graphicsDevice, Color.Silver, Color.Gray) // Gümüş çerçeve, gri taş
+            Icon = amulet ?? CreateAmuletIcon(graphicsDevice, Color.Silver, Color.Gray),
+            IconColor = Color.Silver // TINT
         };
         
         // ID 31: Büyülü Muska
@@ -332,7 +373,8 @@ public static class ItemDatabase
             Type = ItemType.Material,
             Rarity = ItemRarity.Legendary,
             BuyPrice = 5000, // Rebalance: Magic Amulet
-            Icon = CreateAmuletIcon(graphicsDevice, Color.Gold, Color.Purple) // Altın çerçeve, mor taş
+            Icon = amulet ?? CreateAmuletIcon(graphicsDevice, Color.Gold, Color.Purple),
+            IconColor = Color.Violet // TINT
         };
 
         // === KALKANLAR ===
@@ -349,7 +391,7 @@ public static class ItemDatabase
             Defense = 5,
             BlockChance = 10,
             BuyPrice = 150, // Rebalance: 60 -> 150
-            Icon = CreateShieldIcon(graphicsDevice, new Color(139, 90, 43)) // Kahverengi tahta
+            Icon = shield2 ?? CreateShieldIcon(graphicsDevice, new Color(139, 90, 43)) // shield_2 (Simpler)
         };
         
         // ID 41: Demir Kalkan
@@ -364,7 +406,7 @@ public static class ItemDatabase
             Defense = 12,
             BlockChance = 18,
             BuyPrice = 750, // Rebalance: 150 -> 750
-            Icon = CreateShieldIcon(graphicsDevice, new Color(180, 180, 190)) // Gümüş/Demir
+            Icon = shield1 ?? CreateShieldIcon(graphicsDevice, new Color(180, 180, 190)) // shield_1 (Better)
         };
         
         // === KASKLAR ===
@@ -380,8 +422,8 @@ public static class ItemDatabase
             RequiredLevel = 1,
             Defense = 3,
             Health = 5,
-            BuyPrice = 150, // Rebalance: 35 -> 150
-            Icon = CreateHelmetIcon(graphicsDevice, new Color(120, 80, 50)) // Kahverengi deri
+            BuyPrice = 150,
+            Icon = helmet1 // helmet_1 (Leather)
         };
         
         // ID 51: Demir Kask
@@ -391,12 +433,12 @@ public static class ItemDatabase
             Name = "Demir Kask",
             Description = "Saglam demir kask.",
             Type = ItemType.Helmet,
-            Rarity = ItemRarity.Uncommon,
+            Rarity = ItemRarity.Common,
             RequiredLevel = 1,
             Defense = 8,
             Health = 15,
-            BuyPrice = 500, // Rebalance: 100 -> 500
-            Icon = CreateHelmetIcon(graphicsDevice, new Color(180, 180, 190)) // Gümüş/Demir
+            BuyPrice = 500,
+            Icon = helmet2 // helmet_2 (Iron)
         };
 
         _initialized = true;

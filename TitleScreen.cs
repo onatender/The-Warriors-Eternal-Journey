@@ -246,11 +246,19 @@ public class TitleScreen
     
     public void Draw(SpriteBatch spriteBatch, SpriteFont font)
     {
-        // Title
+        // 1. TAM ORTALI TITLE
         string title = "THE WARRIOR'S ETERNAL JOURNEY";
-        Vector2 titleSize = font.MeasureString(title);
+        Vector2 titleSize = font.MeasureString(title) * 1.5f; // Scale 1.5
+        
+        // Ekranın tam ortası
+        float centerX = _screenWidth / 2f;
+        float centerY = _screenHeight / 2f;
+        
+        // Başlık pozisyonu (Ekranın üst kısmında ortalı)
+        Vector2 titlePos = new Vector2(centerX - titleSize.X / 2f, 80);
+        
         spriteBatch.DrawString(font, title, 
-            new Vector2((_screenWidth - titleSize.X) / 2, 80), 
+            titlePos, 
             Color.Gold, 0f, Vector2.Zero, 1.5f, SpriteEffects.None, 0f);
             
         // Slots
@@ -270,7 +278,7 @@ public class TitleScreen
             spriteBatch.Draw(_panelTexture, new Rectangle(r.X, r.Y, 2, r.Height), borderColor);
             spriteBatch.Draw(_panelTexture, new Rectangle(r.Right-2, r.Y, 2, r.Height), borderColor);
             
-            // Text
+            // Text - Slot İçeriği de ortalanabilir veya sola hizalı kalabilir
             SaveData data = _saveSlots[i];
             if (data != null)
             {
@@ -284,7 +292,11 @@ public class TitleScreen
                 spriteBatch.DrawString(font, $"SLOT {i+1}: [ EMPTY ]", new Vector2(r.X + 20, r.Y + 35), Color.Gray);
                 if (isHover)
                 {
-                     spriteBatch.DrawString(font, "(Click to Create New)", new Vector2(r.X + 250, r.Y + 35), Color.Yellow, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
+                     string clickText = "(Click to Create New)";
+                     Vector2 clickSz = font.MeasureString(clickText) * 0.7f;
+                     spriteBatch.DrawString(font, clickText, 
+                        new Vector2(r.Right - clickSz.X - 20, r.Y + 35), 
+                        Color.Yellow, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
                 }
             }
         }
@@ -327,14 +339,22 @@ public class TitleScreen
             spriteBatch.DrawString(font, cancelTxt, new Vector2(_btnCancelRect.Center.X - cSz.X/2, _btnCancelRect.Center.Y - cSz.Y/2), Color.White);
         }
         
-        // DRAW VOLUME SLIDER
+        // DRAW VOLUME SLIDER (FIXED LAYOUT)
         // Label
-        spriteBatch.DrawString(font, "SES:", new Vector2(_volumeBarRect.X - 40, _volumeBarRect.Y - 5), Color.Gray);
-        // Bar
+        string volLabel = $"SES: %{(int)(_currentVolume * 100)}";
+        Vector2 volLabelSize = font.MeasureString(volLabel);
+        
+        // Label to the left of Bar
+        Vector2 labelPos = new Vector2(_volumeBarRect.X - volLabelSize.X - 10, _volumeBarRect.Y - volLabelSize.Y / 2 + 5);
+        spriteBatch.DrawString(font, volLabel, labelPos, Color.White);
+        
+        // Bar Background
         spriteBatch.Draw(_panelTexture, _volumeBarRect, Color.DarkGray);
+        
         // Fill
         Rectangle fillRect = new Rectangle(_volumeBarRect.X, _volumeBarRect.Y, (int)(_volumeBarRect.Width * _currentVolume), _volumeBarRect.Height);
         spriteBatch.Draw(_panelTexture, fillRect, Color.Lime);
+        
         // Knob
         spriteBatch.Draw(_panelTexture, _volumeKnobRect, Color.White);
     }
