@@ -75,12 +75,21 @@ public class Inventory
     private SoundEffect _sfxCoinSell;
     private SoundEffect _sfxCoinDrop;
     
+    private SoundEffect _sfxItemPickup;
+    private SoundEffect _sfxItemEquip;
+    
     public void SetCoinSounds(SoundEffect pickup, SoundEffect buy, SoundEffect sell, SoundEffect drop)
     {
         _sfxCoinPickup = pickup;
         _sfxCoinBuy = buy;
         _sfxCoinSell = sell;
         _sfxCoinDrop = drop;
+    }
+    
+    public void SetItemSounds(SoundEffect pickup, SoundEffect equip)
+    {
+        _sfxItemPickup = pickup;
+        _sfxItemEquip = equip;
     }
     
     // Pozisyon
@@ -678,6 +687,7 @@ public class Inventory
     
     private void BeginDrag(InventorySlot source, bool isEquip, int equipIndex)
     {
+        _sfxItemPickup?.Play(0.6f, 0.0f, 0.0f);
         _isDragging = true;
         _dragSourceSlot = source;
         _dragItem = source.Item;
@@ -814,6 +824,7 @@ public class Inventory
                     
                     FireEquipEvent(_hoveredEquipSlot, _dragItem);
                     if (_dragFromEquip) FireEquipEvent(_dragEquipIndex, null); // Eski yer boşaldı
+                    _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
                     handled = true;
                 }
                 else
@@ -839,6 +850,7 @@ public class Inventory
                         
                         FireEquipEvent(_hoveredEquipSlot, _dragItem);
                         if (_dragFromEquip) FireEquipEvent(_dragEquipIndex, temp);
+                        _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
                         
                         handled = true;
                     }
@@ -908,12 +920,14 @@ public class Inventory
                     // Silahı giy
                     SwapOrMove(slot, WeaponSlot);
                     OnWeaponEquipped?.Invoke(WeaponSlot.Item);
+                    _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
                 }
                 else if (slot.Item.Type == ItemType.Armor)
                 {
                     // Zırhı giy
                     SwapOrMove(slot, ArmorSlot);
                     OnArmorEquipped?.Invoke(ArmorSlot.Item);
+                    _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
                 }
                 else if (slot.Item.Type == ItemType.Consumable)
                 {
@@ -934,12 +948,14 @@ public class Inventory
                     // Kalkanı giy
                     SwapOrMove(slot, ShieldSlot);
                     OnShieldEquipped?.Invoke(ShieldSlot.Item);
+                    _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
                 }
                 else if (slot.Item.Type == ItemType.Helmet)
                 {
                     // Kaskı giy
                     SwapOrMove(slot, HelmetSlot);
                     OnHelmetEquipped?.Invoke(HelmetSlot.Item);
+                    _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
                 }
             }
         }
@@ -1232,18 +1248,54 @@ public class Inventory
         // Fiyat bilgisi
         string priceInfo = $"Satis: {item.SellPrice}G | Alis: {item.BuyPrice}G";
         
+        // Açıklama Metni
+        string description = item.Description ?? "";
+        List<string> descLines = new List<string>();
+        float maxDescWidth = 250f;
+        
+        if (!string.IsNullOrEmpty(description))
+        {
+            string[] words = description.Split(' ');
+            string currentLine = "";
+            foreach (var word in words)
+            {
+                string testLine = string.IsNullOrEmpty(currentLine) ? word : currentLine + " " + word;
+                if (font.MeasureString(testLine).X * 0.7f > maxDescWidth)
+                {
+                    descLines.Add(currentLine);
+                    currentLine = word;
+                }
+                else
+                {
+                    currentLine = testLine;
+                }
+            }
+            if (!string.IsNullOrEmpty(currentLine)) descLines.Add(currentLine);
+        }
+
         // Boyut hesapla
         float scale = 0.8f;
+        float descScale = 0.7f;
         Vector2 nameSize = font.MeasureString(name) * scale;
         Vector2 typeSize = font.MeasureString(type) * scale;
         Vector2 levelSize = level.Length > 0 ? font.MeasureString(level) * scale : Vector2.Zero;
         Vector2 statsSize = stats.Length > 0 ? font.MeasureString(stats) * scale : Vector2.Zero;
         Vector2 priceSize = font.MeasureString(priceInfo) * scale;
         
+        float descHeight = descLines.Count * (font.LineSpacing * 0.75f);
+        
         float maxWidth = Math.Max(Math.Max(nameSize.X, typeSize.X), Math.Max(Math.Max(levelSize.X, statsSize.X), priceSize.X));
-        float totalHeight = nameSize.Y + typeSize.Y + (level.Length > 0 ? levelSize.Y + 5 : 0) + (stats.Length > 0 ? statsSize.Y + 5 : 0) + priceSize.Y + 20;
+        if(descLines.Count > 0) maxWidth = Math.Max(maxWidth, maxDescWidth);
+        
+        float totalHeight = nameSize.Y + typeSize.Y + (level.Length > 0 ? levelSize.Y + 5 : 0) + (stats.Length > 0 ? statsSize.Y + 5 : 0) 
+            + (descLines.Count > 0 ? descHeight + 10 : 0) + priceSize.Y + 20;
         
         // Ekran sınırlarını kontrol et
+        if (position.X + maxWidth + 20 > _screenWidth)
+        {
+             position.X = _screenWidth - maxWidth - 25;
+        }
+            
         if (position.X + maxWidth + 20 > _screenWidth)
             position.X = _screenWidth - maxWidth - 25;
         if (position.Y + totalHeight > _screenHeight)
@@ -1290,6 +1342,19 @@ public class Inventory
             spriteBatch.DrawString(font, stats, position + new Vector2(0, yOffset), new Color(100, 200, 100),
                 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
             yOffset += statsSize.Y + 5;
+        }
+        
+        // Açıklama Yazısı
+        if (descLines.Count > 0)
+        {
+            yOffset += 5;
+            foreach (var line in descLines)
+            {
+                spriteBatch.DrawString(font, line, position + new Vector2(0, yOffset), new Color(200, 200, 200),
+                    0f, Vector2.Zero, descScale, SpriteEffects.None, 0f);
+                yOffset += font.LineSpacing * 0.75f;
+            }
+            yOffset += 5;
         }
         
         // Fiyat bilgisi

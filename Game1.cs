@@ -550,7 +550,16 @@ public partial class Game1 : Game
         _sfxCoinSell = Content.Load<SoundEffect>("SFX/sfx_coin_sell");
         _sfxCoinDrop = Content.Load<SoundEffect>("SFX/sfx_coin_drop");
         
+        // Item SFX
+        SoundEffect sfxItemPickup = null;
+        SoundEffect sfxItemEquip = null;
+        try {
+            sfxItemPickup = Content.Load<SoundEffect>("SFX/item_pickup");
+            sfxItemEquip = Content.Load<SoundEffect>("SFX/item_equip");
+        } catch { System.Diagnostics.Debug.WriteLine("Item SFX not found"); }
+        
         _inventory.SetCoinSounds(_sfxCoinPickup, _sfxCoinBuy, _sfxCoinSell, _sfxCoinDrop);
+        _inventory.SetItemSounds(sfxItemPickup, sfxItemEquip);
         _shopUI.SetCoinSounds(_sfxCoinBuy, _sfxCoinSell);
         
         try {

@@ -334,7 +334,7 @@ public class ShopUI
             {
                 spriteBatch.Draw(itemInfo.item.Icon, 
                     new Rectangle(slotRect.X + 5, slotRect.Y + 5, SLOT_SIZE - 10, SLOT_SIZE - 10),
-                    itemInfo.item.GetRarityColor());
+                    itemInfo.item.GetTintColor()); // BUG FIX: GetRarityColor -> GetTintColor
 
                 if (itemInfo.item.Id == 32 || itemInfo.item.Id == 10)
                 {
@@ -464,14 +464,44 @@ public class ShopUI
         
         Color priceColor = showSellPrice ? Color.LightGreen : Color.Gold;
         
+        // Açıklama Metni (Wrap Logic)
+        string description = item.Description ?? "";
+        List<string> descLines = new List<string>();
+        float maxDescWidth = 250f; // Max tooltip genişliği
+        
+        if (!string.IsNullOrEmpty(description))
+        {
+            string[] words = description.Split(' ');
+            string currentLine = "";
+            foreach (var word in words)
+            {
+                string testLine = string.IsNullOrEmpty(currentLine) ? word : currentLine + " " + word;
+                if (font.MeasureString(testLine).X * 0.7f > maxDescWidth)
+                {
+                    descLines.Add(currentLine);
+                    currentLine = word;
+                }
+                else
+                {
+                    currentLine = testLine;
+                }
+            }
+            if (!string.IsNullOrEmpty(currentLine)) descLines.Add(currentLine);
+        }
+
         float scale = 0.75f;
         Vector2 nameSize = font.MeasureString(name) * scale;
         Vector2 typeSize = font.MeasureString(type) * scale;
         Vector2 statsSize = stats.Length > 0 ? font.MeasureString(stats) * scale : Vector2.Zero;
         Vector2 priceSize = font.MeasureString(priceText) * scale;
         
+        // Satırlar arası boşluk artırıldı (basık görünüm düzeltildi)
+        float descHeight = descLines.Count * (font.LineSpacing * 0.75f); 
+        
         float maxWidth = Math.Max(Math.Max(nameSize.X, typeSize.X), Math.Max(statsSize.X, priceSize.X));
-        float totalHeight = nameSize.Y + typeSize.Y + (stats.Length > 0 ? statsSize.Y + 5 : 0) + priceSize.Y + 20;
+        if (descLines.Count > 0) maxWidth = Math.Max(maxWidth, maxDescWidth);
+        
+        float totalHeight = nameSize.Y + typeSize.Y + (stats.Length > 0 ? statsSize.Y + 5 : 0) + (descLines.Count > 0 ? descHeight + 10 : 0) + priceSize.Y + 20;
         
         // Ekran sınırları
         if (position.X + maxWidth + 20 > _screenWidth)
@@ -486,11 +516,13 @@ public class ShopUI
             (int)totalHeight + 10
         );
         
-        spriteBatch.Draw(_backgroundTexture, bgRect, new Color(20, 22, 30, 245));
+        spriteBatch.Draw(_backgroundTexture, bgRect, new Color(20, 22, 30, 250));
         
         // Kenarlık
         spriteBatch.Draw(_backgroundTexture, new Rectangle(bgRect.X, bgRect.Y, bgRect.Width, 1), new Color(80, 80, 100));
         spriteBatch.Draw(_backgroundTexture, new Rectangle(bgRect.X, bgRect.Y, 1, bgRect.Height), new Color(80, 80, 100));
+        spriteBatch.Draw(_backgroundTexture, new Rectangle(bgRect.Right - 1, bgRect.Y, 1, bgRect.Height), new Color(80, 80, 100));
+        spriteBatch.Draw(_backgroundTexture, new Rectangle(bgRect.X, bgRect.Bottom - 1, bgRect.Width, 1), new Color(80, 80, 100));
         
         float yOffset = 0;
         spriteBatch.DrawString(font, name, position + new Vector2(0, yOffset), item.GetRarityColor(),
@@ -506,6 +538,19 @@ public class ShopUI
             spriteBatch.DrawString(font, stats, position + new Vector2(0, yOffset), new Color(100, 200, 100),
                 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
             yOffset += statsSize.Y + 5;
+        }
+        
+        // Açıklama Çizimi
+        if (descLines.Count > 0)
+        {
+            yOffset += 5;
+            foreach (var line in descLines)
+            {
+                spriteBatch.DrawString(font, line, position + new Vector2(0, yOffset), new Color(200, 200, 200),
+                    0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f); // Scale 0.7f yapıldı
+                yOffset += font.LineSpacing * 0.75f;
+            }
+            yOffset += 5;
         }
         
         spriteBatch.DrawString(font, priceText, position + new Vector2(0, yOffset), priceColor,
