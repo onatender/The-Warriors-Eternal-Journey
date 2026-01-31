@@ -135,6 +135,18 @@
 /processorParam:Quality=Best
 /build:SFX/bg_main.mp3
 
+#begin SFX/drink_potion.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/drink_potion.mp3
+
+#begin SFX/level_up.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/level_up.mp3
+
 #begin icons/health_spell.png
 /importer:TextureImporter
 /processor:TextureProcessor

@@ -69,6 +69,7 @@ public class Player
     private SoundEffect _sfxSlice2;
     private SoundEffect _sfxWalk;
     private SoundEffectInstance _walkSoundInstance;
+    private SoundEffect _sfxLevelUp;
 
     public void SetCombatSounds(SoundEffect s1, SoundEffect s2)
     {
@@ -85,6 +86,16 @@ public class Player
             _walkSoundInstance.IsLooped = true;
             _walkSoundInstance.Volume = 0.3f; // Düşük ses seviyesi
         }
+    }
+    
+    public void SetLevelUpSound(SoundEffect sfx)
+    {
+        _sfxLevelUp = sfx;
+    }
+    
+    public void PlayLevelUpSound()
+    {
+        _sfxLevelUp?.Play();
     }
     
     // --- PARÇACIK SİSTEMİ ---
@@ -115,7 +126,10 @@ public class Player
             Level++; // MaxExperience setter içinde güncellenir
             MaxHealth += 10; 
             CurrentHealth = MaxHealth; 
+            MaxHealth += 10; 
+            CurrentHealth = MaxHealth; 
             OnLevelUp?.Invoke();
+            PlayLevelUpSound();
         }
     }
     private Enemy _currentTarget = null;
@@ -128,6 +142,7 @@ public class Player
     // Combat Status
     private float _timeSinceLastCombat = 0f;
     private float _regenTimer = 0f;
+    private double _lastCoinSoundTime = 0; // Cooldown for coin sound
     
     public Vector2 Position => _position;
     public void SetPosition(Vector2 newPos) { _position = newPos; }
@@ -167,7 +182,14 @@ public class Player
     public void GainGold(int amount, bool silent = false)
     {
         Gold += amount;
-        if (!silent && amount > 0) SfxCoinPickup?.Play();
+        if (!silent && amount > 0)
+        {
+            if (Game1.TotalTime - _lastCoinSoundTime > 0.1) // 100ms cooldown
+            {
+                SfxCoinPickup?.Play();
+                _lastCoinSoundTime = Game1.TotalTime;
+            }
+        }
     }
     
     public void LoseGold(int amount)

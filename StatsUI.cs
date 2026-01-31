@@ -33,7 +33,7 @@ namespace EternalJourney
             spriteBatch.Draw(_backgroundTexture, bounds, Color.White);
             
             // Title
-            string title = "KARAKTER OZELLIKLERI";
+            string title = "KARAKTER ÖZELLİKLERİ";
             Vector2 titleSize = font.MeasureString(title);
             spriteBatch.DrawString(font, title, 
                 new Vector2(bounds.X + (width - titleSize.X)/2, bounds.Y + 20), 
@@ -46,13 +46,13 @@ namespace EternalJourney
             DrawStat(spriteBatch, font, "Seviye:", player.Level.ToString(), pos, Color.White);
             pos.Y += spacing;
             
-            DrawStat(spriteBatch, font, "Tecrube:", $"{player.Experience} / {player.MaxExperience}", pos, Color.LightGray);
+            DrawStat(spriteBatch, font, "Tecrübe:", $"{player.Experience} / {player.MaxExperience}", pos, Color.LightGray);
             pos.Y += spacing;
             
-            DrawStat(spriteBatch, font, "Saglik:", $"{player.CurrentHealth} / {player.MaxHealth}", pos, Color.LightGreen);
+            DrawStat(spriteBatch, font, "Sağlık:", $"{player.CurrentHealth} / {player.MaxHealth}", pos, Color.LightGreen);
             pos.Y += spacing;
             
-            DrawStat(spriteBatch, font, "Altin:", player.Gold.ToString(), pos, Color.Yellow);
+            DrawStat(spriteBatch, font, "Altın:", player.Gold.ToString(), pos, Color.Yellow);
             pos.Y += spacing + 10;
             
             // Combat Stats

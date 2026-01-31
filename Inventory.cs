@@ -77,6 +77,7 @@ public class Inventory
     
     private SoundEffect _sfxItemPickup;
     private SoundEffect _sfxItemEquip;
+    private SoundEffect _sfxPotionDrink;
     
     public void SetCoinSounds(SoundEffect pickup, SoundEffect buy, SoundEffect sell, SoundEffect drop)
     {
@@ -90,6 +91,11 @@ public class Inventory
     {
         _sfxItemPickup = pickup;
         _sfxItemEquip = equip;
+    }
+    
+    public void SetPotionSound(SoundEffect potion)
+    {
+        _sfxPotionDrink = potion;
     }
     
     // Pozisyon
@@ -493,9 +499,9 @@ public class Inventory
         int equipY = (int)_position.Y + 60;
         
         _weaponSlotRect = new Rectangle(equipX, equipY, 60, 60);
-        _armorSlotRect = new Rectangle(equipX, equipY + 70, 60, 60);
-        _shieldSlotRect = new Rectangle(equipX, equipY + 140, 60, 60);
-        _helmetSlotRect = new Rectangle(equipX, equipY + 210, 60, 60);
+        _armorSlotRect = new Rectangle(equipX, equipY + 95, 60, 60);
+        _shieldSlotRect = new Rectangle(equipX, equipY + 190, 60, 60);
+        _helmetSlotRect = new Rectangle(equipX, equipY + 285, 60, 60);
     }
     
     public void UpdateScreenSize(int screenWidth, int screenHeight)
@@ -824,7 +830,8 @@ public class Inventory
                     _dragSourceSlot.Quantity = 0;
                     
                     FireEquipEvent(_hoveredEquipSlot, _dragItem);
-                    if (_dragFromEquip) FireEquipEvent(_dragEquipIndex, null); // Eski yer boşaldı
+                    if (_dragFromEquip && _hoveredEquipSlot != _dragEquipIndex) 
+                        FireEquipEvent(_dragEquipIndex, null); // Eski yer boşaldı (Eğer aynı yer değilse)
                     _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
                     handled = true;
                 }
@@ -920,47 +927,61 @@ public class Inventory
                     return;
                 }
                 
-                    // Silahı giy
-                    if (_player.Level >= slot.Item.RequiredLevel)
+                    // Eşya Tipine Göre İşlem Yap
+                    if (slot.Item.Type == ItemType.Weapon)
                     {
-                        SwapOrMove(slot, WeaponSlot);
-                        OnWeaponEquipped?.Invoke(WeaponSlot.Item);
-                        _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
-                    }
-                    // Zırhı giy
-                    if (_player.Level >= slot.Item.RequiredLevel)
-                    {
-                        SwapOrMove(slot, ArmorSlot);
-                        OnArmorEquipped?.Invoke(ArmorSlot.Item);
-                        _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
-                    }
-                else if (slot.Item.Type == ItemType.Consumable)
-                {
-                    // Potions
-                    if (_player != null)
-                    {
-                        _player.Heal(slot.Item.Health);
-                        // Reduce quantity
-                        slot.Quantity--;
-                        if (slot.Quantity <= 0)
+                        if (_player.Level >= slot.Item.RequiredLevel)
                         {
-                            slot.Item = null;
+                            SwapOrMove(slot, WeaponSlot);
+                            OnWeaponEquipped?.Invoke(WeaponSlot.Item);
+                            _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
                         }
                     }
-                }
-                    // Kalkanı giy
-                    if (_player.Level >= slot.Item.RequiredLevel)
+                    else if (slot.Item.Type == ItemType.Armor)
                     {
-                        SwapOrMove(slot, ShieldSlot);
-                        OnShieldEquipped?.Invoke(ShieldSlot.Item);
-                        _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
+                        if (_player.Level >= slot.Item.RequiredLevel)
+                        {
+                            SwapOrMove(slot, ArmorSlot);
+                            OnArmorEquipped?.Invoke(ArmorSlot.Item);
+                            _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
+                        }
                     }
-                    // Kaskı giy
-                    if (_player.Level >= slot.Item.RequiredLevel)
+                    else if (slot.Item.Type == ItemType.Shield)
                     {
-                        SwapOrMove(slot, HelmetSlot);
-                        OnHelmetEquipped?.Invoke(HelmetSlot.Item);
-                        _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
+                        if (_player.Level >= slot.Item.RequiredLevel)
+                        {
+                            SwapOrMove(slot, ShieldSlot);
+                            OnShieldEquipped?.Invoke(ShieldSlot.Item);
+                            _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
+                        }
+                    }
+                    else if (slot.Item.Type == ItemType.Helmet)
+                    {
+                        if (_player.Level >= slot.Item.RequiredLevel)
+                        {
+                            SwapOrMove(slot, HelmetSlot);
+                            OnHelmetEquipped?.Invoke(HelmetSlot.Item);
+                            _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
+                        }
+                    }
+                    else if (slot.Item.Type == ItemType.Consumable)
+                    {
+                        // Potions
+                        if (_player != null)
+                        {
+                            _player.Heal(slot.Item.Health);
+                            // Reduce quantity
+                            slot.Quantity--;
+                            if (slot.Quantity <= 0)
+                            {
+                                slot.Item = null;
+                            }
+                            // Play multiple times to boost volume
+                             _sfxPotionDrink?.Play(1.0f, 0.0f, 0.0f);
+                             _sfxPotionDrink?.Play(1.0f, 0.0f, 0.0f);
+                             _sfxPotionDrink?.Play(1.0f, 0.0f, 0.0f);
+                             _sfxPotionDrink?.Play(1.0f, 0.0f, 0.0f);
+                        }
                     }
             }
         }
@@ -1111,7 +1132,7 @@ public class Inventory
         }
         
         // Equipment Panel başlığı
-        string equipTitle = "ESYA";
+        string equipTitle = "EŞYA";
         Vector2 equipTitlePos = new Vector2(_weaponSlotRect.X - 5, _position.Y + 15);
         spriteBatch.DrawString(font, equipTitle, equipTitlePos + new Vector2(1, 1), new Color(0, 0, 0, 150));
         spriteBatch.DrawString(font, equipTitle, equipTitlePos, new Color(180, 160, 120));
@@ -1133,13 +1154,13 @@ public class Inventory
             _hoveredEquipSlot == 3, _selectedSlot == HelmetSlot);
         
         // Slot etiketleri
-        spriteBatch.DrawString(font, "Silah", new Vector2(_weaponSlotRect.X, _weaponSlotRect.Bottom + 2), 
+        spriteBatch.DrawString(font, "Silah", new Vector2(_weaponSlotRect.X, _weaponSlotRect.Bottom + 5), 
             new Color(150, 150, 150), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
-        spriteBatch.DrawString(font, "Zirh", new Vector2(_armorSlotRect.X, _armorSlotRect.Bottom + 2), 
+        spriteBatch.DrawString(font, "Zırh", new Vector2(_armorSlotRect.X, _armorSlotRect.Bottom + 5), 
             new Color(150, 150, 150), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
-        spriteBatch.DrawString(font, "Kalkan", new Vector2(_shieldSlotRect.X, _shieldSlotRect.Bottom + 2), 
+        spriteBatch.DrawString(font, "Kalkan", new Vector2(_shieldSlotRect.X, _shieldSlotRect.Bottom + 5), 
             new Color(150, 150, 150), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
-        spriteBatch.DrawString(font, "Kask", new Vector2(_helmetSlotRect.X, _helmetSlotRect.Bottom + 2), 
+        spriteBatch.DrawString(font, "Kask", new Vector2(_helmetSlotRect.X, _helmetSlotRect.Bottom + 5), 
             new Color(150, 150, 150), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
         
         // Sayfa göstergesi
@@ -1697,5 +1718,77 @@ public class Inventory
         sb.Draw(_pixelTexture,
             new Rectangle((int)start.X, (int)start.Y, (int)edge.Length(), thickness),
             null, color, angle, Vector2.Zero, SpriteEffects.None, 0);
+    }
+    
+    // --- POTION HELPER METHODS ---
+    public int GetPotionCount()
+    {
+        int count = 0;
+        for (int p = 0; p < PAGE_COUNT; p++)
+        {
+            for (int y = 0; y < GRID_SIZE; y++)
+            {
+                for (int x = 0; x < GRID_SIZE; x++)
+                {
+                    var slot = _slots[p, y, x];
+                    if (!slot.IsEmpty && slot.Item != null && slot.Item.Type == ItemType.Consumable)
+                    {
+                        count += slot.Quantity;
+                    }
+                }
+            }
+        }
+        return count;
+    }
+    
+    public Item GetFirstPotion()
+    {
+        for (int p = 0; p < PAGE_COUNT; p++)
+        {
+            for (int y = 0; y < GRID_SIZE; y++)
+            {
+                for (int x = 0; x < GRID_SIZE; x++)
+                {
+                    var slot = _slots[p, y, x];
+                    if (!slot.IsEmpty && slot.Item != null && slot.Item.Type == ItemType.Consumable)
+                    {
+                        return slot.Item;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+    
+    public bool UseFirstPotion()
+    {
+        if (_player == null) return false;
+        
+        for (int p = 0; p < PAGE_COUNT; p++)
+        {
+            for (int y = 0; y < GRID_SIZE; y++)
+            {
+                for (int x = 0; x < GRID_SIZE; x++)
+                {
+                    var slot = _slots[p, y, x];
+                    if (!slot.IsEmpty && slot.Item != null && slot.Item.Type == ItemType.Consumable)
+                    {
+                        // Use potion
+                        _player.Heal(slot.Item.Health);
+                        // Play multiple times to boost volume
+                        _sfxPotionDrink?.Play(1.0f, 0.0f, 0.0f);
+                        _sfxPotionDrink?.Play(1.0f, 0.0f, 0.0f);
+                        _sfxPotionDrink?.Play(1.0f, 0.0f, 0.0f);
+                        _sfxPotionDrink?.Play(1.0f, 0.0f, 0.0f);
+                        
+                        slot.Quantity--;
+                        if (slot.Quantity <= 0) slot.Item = null;
+                        
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 }

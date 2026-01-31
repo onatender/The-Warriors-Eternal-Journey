@@ -106,6 +106,7 @@ public class Enemy
     // Global ses kontrolü (idle sesleri için)
     private static float _globalIdleSoundTimer = 0f;
     private const float MIN_IDLE_SOUND_INTERVAL = 4.0f; // En az 4 saniye ara
+    private static double _lastDeathSoundTime = 0; // Ölüm sesi için global cooldown
     
     public event Action<int> OnAttackPlayer;
     
@@ -681,7 +682,11 @@ public class Enemy
             // Death Sound
             if (Type == EnemyType.Goblin && SfxGoblinDeath != null)
             {
-                SfxGoblinDeath.Play(0.5f, 0f, 0f);
+                if (Game1.TotalTime - _lastDeathSoundTime > 0.1) // 100ms cooldown
+                {
+                    SfxGoblinDeath.Play(0.5f, 0f, 0f);
+                    _lastDeathSoundTime = Game1.TotalTime;
+                }
             }
         }
     }

@@ -117,6 +117,11 @@ public partial class Game1 : Game
     // Revive UI
     private ReviveUI _reviveUI;
     
+    // Pause Menu State
+    private bool _showSettingsInPause = false;
+    private float _saveConfirmationTimer = 0f;
+    private double _lastClashSoundTime = 0; // Cooldown for hit sound
+    
 
 
     public Game1()
@@ -155,10 +160,18 @@ public partial class Game1 : Game
             // Başlangıç itemlarını envantere ekle
             // Başlangıç itemlarını envantere ekle ve kuşan (Böylece skiller çalışır)
             Item startWeapon = ItemDatabase.GetItem(1); // Tahta Kılıç
-            _player.EquipWeapon(startWeapon);
-            _inventory.AddItem(startWeapon.Id, 1); 
+            if (startWeapon != null)
+            {
+                _player.EquipWeapon(startWeapon);
+                _inventory.WeaponSlot.Item = startWeapon;
+                _inventory.WeaponSlot.Quantity = 1;
+            }
             
-            _inventory.AddItem(3); // Deri Zırh
+            // 3 Adet Can İksiri
+            _inventory.AddItem(25, 3);
+            
+            // Deri Zırh kaldırıldı
+
             
             // Başlangıç pozisyonu
              _player.SetPosition(new Vector2(MAP_WIDTH / 2f - 24, MAP_HEIGHT / 2f - 32));
@@ -179,8 +192,9 @@ public partial class Game1 : Game
                  _player.CurrentHealth = data.CurrentHealth;
                  _player.MaxHealth = data.MaxHealth;
                  _player.Level = data.Level;
-                 _player.GainExperience((int)data.Experience);
-                 _player.GainGold(data.Gold, true);
+                 _player.Experience = data.Experience; // Direkt set et, GainExperience çağırma (yoksa ekliyor ve level atlıyor)
+                 //_player.GainExperience((int)data.Experience); 
+                 _player.Gold = data.Gold; // Direkt set et, GainGold çağırma (ekleme yapıyor)
                  
                  // 1. Önce Map'i yükle
                  _currentMapIndex = data.MapIndex;
@@ -325,8 +339,12 @@ public partial class Game1 : Game
         // Oyuncu saldırı event'i
         _player.OnAttackHit += (enemy, damage) =>
         {
-            // Oynat Clash Sesi
-            _sfxClash?.Play(0.3f, 0.0f, 0.0f);
+            // Oynat Clash Sesi (Cooldown ekle: 0.1 sn)
+            if (TotalTime - _lastClashSoundTime > 0.1)
+            {
+                _sfxClash?.Play(0.3f, 0.0f, 0.0f);
+                _lastClashSoundTime = TotalTime;
+            }
 
             // Hasar sayısı ekle
             _damageNumbers.Add(new DamageNumber(
@@ -406,11 +424,12 @@ public partial class Game1 : Game
         // Arka Plan Texture Oluştur
         _backgroundTexture = CreateDungeonFloor(1);
         
-        // Başlangıç Eşyaları
-        _inventory.AddItem(1); // Tahta Kılıç
-        _inventory.AddItem(25); // Can İksiri
-        _inventory.AddItem(25); // Can İksiri
-        _inventory.AddItem(25); // Can İksiri
+        // Başlangıç Eşyaları - ARTIK BURADA EKLENMIYOR (OnTitleScreenStart'a taşındı)
+        // _inventory.AddItem(1); 
+        // _inventory.AddItem(25); 
+        // _inventory.AddItem(25); 
+        // _inventory.AddItem(25); 
+
         
         // Envanter event'lerini bağla
         _inventory.OnWeaponEquipped += (weapon) => _player.EquipWeapon(weapon);
@@ -543,6 +562,7 @@ public partial class Game1 : Game
             _graphics.PreferredBackBufferHeight);
             
         _titleScreen.OnGameStart += OnTitleScreenStart;
+        _titleScreen.OnExitRequested += Exit;
         
         // Music Manager
         _musicManager = new MusicManager();
@@ -551,7 +571,7 @@ public partial class Game1 : Game
         
         // Skill System Init
         _player.InitializeSkills(GraphicsDevice);
-        _skillBarUI = new SkillBarUI(GraphicsDevice, _player.SkillManager, 
+        _skillBarUI = new SkillBarUI(GraphicsDevice, _player.SkillManager, _inventory,
             _graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight);
             
         _statsUI = new StatsUI(GraphicsDevice, 
@@ -569,13 +589,17 @@ public partial class Game1 : Game
         // Item SFX
         SoundEffect sfxItemPickup = null;
         SoundEffect sfxItemEquip = null;
+        SoundEffect sfxPotionDrink = null;
         try {
             sfxItemPickup = Content.Load<SoundEffect>("SFX/item_pickup");
             sfxItemEquip = Content.Load<SoundEffect>("SFX/item_equip");
+            sfxPotionDrink = Content.Load<SoundEffect>("SFX/drink_potion");
+            _player.SetLevelUpSound(Content.Load<SoundEffect>("SFX/level_up"));
         } catch { System.Diagnostics.Debug.WriteLine("Item SFX not found"); }
         
         _inventory.SetCoinSounds(_sfxCoinPickup, _sfxCoinBuy, _sfxCoinSell, _sfxCoinDrop);
         _inventory.SetItemSounds(sfxItemPickup, sfxItemEquip);
+        _inventory.SetPotionSound(sfxPotionDrink);
         _shopUI.SetCoinSounds(_sfxCoinBuy, _sfxCoinSell);
         
         try {
@@ -813,8 +837,12 @@ public partial class Game1 : Game
                  // This implies interaction with the menu items. 
                  // Toggling the menu ON/OFF with ESC is standard. 
                  _currentState = GameState.Playing;
+                 _currentState = GameState.Playing;
                  IsMouseVisible = !_graphics.IsFullScreen;
             }
+            
+            if (_saveConfirmationTimer > 0)
+                _saveConfirmationTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
             
             _previousKeyState = currentKeyState;
             base.Update(gameTime);
@@ -879,6 +907,7 @@ public partial class Game1 : Game
             {
                 _player.StopMoving();
                 _shopUI.Open(_player, _inventory);
+                return; // Prevent falling through to Player.Update which restarts movement/sound
             }
         }
 
@@ -887,6 +916,7 @@ public partial class Game1 : Game
             if (!_inventory.IsOpen && !_shopUI.IsOpen && !_enhancementUI.IsOpen)
             {
                  _currentState = GameState.Paused;
+                 _showSettingsInPause = false; // Reset settings view
                  _player.StopMoving();
                  IsMouseVisible = true;
             }
@@ -948,7 +978,23 @@ public partial class Game1 : Game
         }
         
         // Player update
+        Vector2 prevPos = _player.Position; // Collision için
         _player.Update(gameTime, MAP_WIDTH, MAP_HEIGHT, _enemyManager, Vector2.Zero);
+        
+        // Vendor Collision (Map 1)
+        if (_currentMapIndex == 1)
+        {
+            Rectangle vendorRect = new Rectangle((int)_vendorPosition.X, (int)_vendorPosition.Y, 48, 64);
+            // Basit bir bounding box daraltma (ayaklara odaklanmak için)
+            Rectangle playerFeet = new Rectangle((int)_player.Position.X + 10, (int)_player.Position.Y + 40, 28, 20);
+            Rectangle vendorFeet = new Rectangle(vendorRect.X + 5, vendorRect.Y + 40, 38, 20);
+            
+            if (playerFeet.Intersects(vendorFeet))
+            {
+                _player.SetPosition(prevPos);
+                // _player.StopMoving(); // Opsiyonel: Kaymayı engellemek için
+            }
+        }
         _player.UpdateCombat(gameTime, _enemyManager);
         _enemyManager.Update(gameTime, _player.Center, _player.Bounds);
         
@@ -998,6 +1044,20 @@ public partial class Game1 : Game
         // Çanta butonu kontrolü
         Point mousePos = new Point(Mouse.GetState().X, Mouse.GetState().Y);
         _isHoveringBag = _bagButtonRect.Contains(mousePos);
+        
+        // Potion Shortcut (0)
+        if (currentKeyState.IsKeyDown(Keys.D0) && !_previousKeyState.IsKeyDown(Keys.D0))
+        {
+            if (_inventory.UseFirstPotion())
+            {
+                 // Effect
+                 _damageNumbers.Add(new DamageNumber(
+                     _player.Center + new Vector2(0, -60),
+                     0,
+                     Color.Lime
+                 ) { CustomText = "+Can" });
+            }
+        }
         
         if (_isHoveringBag && Mouse.GetState().LeftButton == ButtonState.Pressed && _previousMouseState.LeftButton == ButtonState.Released)
         {
@@ -1096,11 +1156,13 @@ public partial class Game1 : Game
             // Mobile UI Draw
             // _joystick.Draw(_spriteBatch);
             _spriteBatch.Draw(_statsIconTexture, _statsButtonRect, _isHoveringStats ? Color.White : new Color(200, 200, 200, 200));
+            // 'C' Label
+            _spriteBatch.DrawString(_gameFont, "C", new Vector2(_statsButtonRect.X - 15, _statsButtonRect.Center.Y - 10), Color.White, 0f, Vector2.Zero, 1.2f, SpriteEffects.None, 0f);
             
             // Eğer Enhancement Mode'daysa bilgi yaz
             if (_inventory.IsEnhancementMode)
             {
-               string modeText = "BIR ESYAYA TIKLA (YUKSELTME ICIN)";
+               string modeText = "BİR EŞYAYA TIKLA (YÜKSELTME İÇİN)";
                Vector2 mousePos = new Vector2(Mouse.GetState().X, Mouse.GetState().Y);
                _spriteBatch.DrawString(_gameFont, modeText, mousePos + new Vector2(15, 15), Color.Cyan);
             }
@@ -1112,11 +1174,11 @@ public partial class Game1 : Game
             // Satıcı etkileşim ipucu
             if (_nearVendor && !_shopUI.IsOpen && !_inventory.IsOpen)
             {
-                string interactText = "[F] Saticiyla Konus";
+                string interactText = "[F] Etkileşime geç";
                 Vector2 textSize = _gameFont.MeasureString(interactText);
                 Vector2 textPos = new Vector2(
                     (GraphicsDevice.Viewport.Width - textSize.X) / 2,
-                    GraphicsDevice.Viewport.Height - 80
+                    GraphicsDevice.Viewport.Height - 140
                 );
                 _spriteBatch.DrawString(_gameFont, interactText, textPos + new Vector2(2, 2), new Color(0, 0, 0, 200));
                 _spriteBatch.DrawString(_gameFont, interactText, textPos, Color.Yellow);
@@ -1130,22 +1192,22 @@ public partial class Game1 : Game
             {
                 Color bagTint = _isHoveringBag ? Color.White : new Color(220, 220, 220);
                 _spriteBatch.Draw(_bagButtonTexture, _bagButtonRect, bagTint);
-                // Tuş ipucu (Visual Icon kullanıldığı için "I" yazısına gerek olmayabilir ama kalsın)
-                 // _spriteBatch.DrawString(_gameFont, "[I]", new Vector2(_bagButtonRect.X, _bagButtonRect.Y - 20), Color.White);
+                // Tuş ipucu - 'I' Label
+                 _spriteBatch.DrawString(_gameFont, "I", new Vector2(_bagButtonRect.X - 15, _bagButtonRect.Center.Y - 10), Color.White, 0f, Vector2.Zero, 1.2f, SpriteEffects.None, 0f);
             }
         }
         
         if (_currentState == GameState.Paused)
         {
             // Karartma
-            _spriteBatch.Draw(_pixelTexture, new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height), new Color(0, 0, 0, 150));
+            _spriteBatch.Draw(_pixelTexture, new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height), new Color(0, 0, 0, 200));
             
             // Başlık
-            string title = "OYUN DURAKLATILDI";
+            string title = _showSettingsInPause ? "AYARLAR" : "OYUN DURAKLATILDI";
             Vector2 titleSize = _gameFont.MeasureString(title);
             Vector2 titlePos = new Vector2(
                 (GraphicsDevice.Viewport.Width - titleSize.X) / 2, 
-                GraphicsDevice.Viewport.Height / 2 - 100
+                GraphicsDevice.Viewport.Height / 2 - 120
             );
             
             _spriteBatch.DrawString(_gameFont, title, titlePos + new Vector2(2, 2), Color.Black);
@@ -1190,61 +1252,95 @@ public partial class Game1 : Game
                 }
             }
             
-            DrawButton("DEVAM ET", 80, Color.White, Color.Lime, () => {
-                _currentState = GameState.Playing;
-            });
-            
-            DrawButton("ÇIKIŞ", 140, Color.IndianRed, Color.Red, () => {
-                Exit();
-            });
-            
-            // --- VOLUME SLIDERS ---
-            int sliderW = 200;
-            int sliderH = 10;
-            int sliderX = (GraphicsDevice.Viewport.Width - sliderW) / 2;
-            int musicSliderY = (int)titlePos.Y + 200;
-            int sfxSliderY = (int)titlePos.Y + 260;
-            
-            void DrawSlider(string label, int x, int y, float volume, bool isMusic)
+            if (!_showSettingsInPause)
             {
-                Rectangle barRect = new Rectangle(x, y, sliderW, sliderH);
-                Rectangle knobRect = new Rectangle(x + (int)(volume * sliderW) - 5, y - 5, 10, 20);
+                // -- NORMAL PAUSE MENU --
+                DrawButton("DEVAM ET", 80, Color.White, Color.Lime, () => {
+                    _currentState = GameState.Playing;
+                });
                 
-                // Label
-                _spriteBatch.DrawString(_gameFont, $"{label}: %{(int)(volume * 100)}", new Vector2(x, y - 25), Color.LightGray, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
+                DrawButton("KAYDET", 140, Color.LightBlue, Color.Cyan, () => {
+                    SaveCurrentGame();
+                    _saveConfirmationTimer = 2.0f;
+                });
                 
-                // Bar
-                _spriteBatch.Draw(_pixelTexture, barRect, Color.Gray * 0.5f);
-                
-                // Knob
-                bool isHover = knobRect.Contains(ms.X, ms.Y) || barRect.Contains(ms.X, ms.Y);
-                _spriteBatch.Draw(_pixelTexture, knobRect, isHover ? Color.Gold : Color.White);
-                
-                // Drag Logic
-                if (ms.LeftButton == ButtonState.Pressed)
+                if (_saveConfirmationTimer > 0)
                 {
-                    if (isMusic && (_isDraggingMusic || barRect.Contains(ms.X, ms.Y)))
-                    {
-                        _isDraggingMusic = true;
-                        float newVol = Math.Clamp((float)(ms.X - x) / sliderW, 0f, 1f);
-                        _musicManager.SetVolume(newVol);
-                    }
-                    else if (!isMusic && (_isDraggingSFX || barRect.Contains(ms.X, ms.Y)))
-                    {
-                        _isDraggingSFX = true;
-                        _sfxVolume = Math.Clamp((float)(ms.X - x) / sliderW, 0f, 1f);
-                        SoundEffect.MasterVolume = _sfxVolume;
-                    }
+                    string msg = "OYUN KAYDEDİLDİ";
+                    Vector2 msgSz = _gameFont.MeasureString(msg);
+                    _spriteBatch.DrawString(_gameFont, msg, new Vector2((GraphicsDevice.Viewport.Width - msgSz.X)/2, titlePos.Y + 320), Color.Lime);
                 }
-                else
-                {
-                    if (isMusic) _isDraggingMusic = false;
-                    else _isDraggingSFX = false;
-                }
+                
+                DrawButton("AYARLAR", 200, Color.LightGray, Color.Yellow, () => {
+                    _showSettingsInPause = true;
+                });
+
+                DrawButton("ANA MENÜ", 260, Color.Orange, Color.Gold, () => {
+                    SaveCurrentGame();
+                    _currentState = GameState.Login;
+                    _titleScreen.Reset(); // Goes to Main Menu
+                });
             }
-            
-            DrawSlider("MÜZİK SESİ", sliderX, musicSliderY, _musicManager.MasterVolume, true);
-            DrawSlider("SES EFEKTLERİ", sliderX, sfxSliderY, _sfxVolume, false);
+            else
+            {
+                 // -- SETTINGS SUBMENU --
+                
+                // --- VOLUME SLIDERS ---
+                int sliderW = 300;
+                int sliderH = 10;
+                int sliderX = (GraphicsDevice.Viewport.Width - sliderW) / 2;
+                int musicSliderY = (int)titlePos.Y + 100;
+                int sfxSliderY = (int)titlePos.Y + 180;
+                
+                void DrawSlider(string label, int x, int y, float volume, bool isMusic)
+                {
+                    Rectangle barRect = new Rectangle(x, y, sliderW, sliderH);
+                    Rectangle knobRect = new Rectangle(x + (int)(volume * sliderW) - 5, y - 5, 10, 20);
+                    
+                    // Label
+                    string lblText = $"{label}: %{(int)(volume * 100)}";
+                    Vector2 lblSz = _gameFont.MeasureString(lblText);
+                    _spriteBatch.DrawString(_gameFont, lblText, new Vector2(x + (sliderW - lblSz.X)/2, y - 30), Color.LightGray);
+                    
+                    // Bar
+                    _spriteBatch.Draw(_pixelTexture, barRect, Color.Gray * 0.5f);
+                    _spriteBatch.Draw(_pixelTexture, new Rectangle(x, y, (int)(volume * sliderW), sliderH), Color.Lime);
+                    
+                    // Knob
+                    bool isHover = knobRect.Contains(ms.X, ms.Y) || barRect.Contains(ms.X, ms.Y);
+                    _spriteBatch.Draw(_pixelTexture, knobRect, isHover ? Color.Gold : Color.White);
+                    
+                    // Drag Logic
+                    if (ms.LeftButton == ButtonState.Pressed)
+                    {
+                        if (isMusic && (_isDraggingMusic || barRect.Contains(ms.X, ms.Y)))
+                        {
+                            _isDraggingMusic = true;
+                            float newVol = Math.Clamp((float)(ms.X - x) / sliderW, 0f, 1f);
+                            _musicManager.SetVolume(newVol);
+                        }
+                        else if (!isMusic && (_isDraggingSFX || barRect.Contains(ms.X, ms.Y)))
+                        {
+                            _isDraggingSFX = true;
+                            float newVol = Math.Clamp((float)(ms.X - x) / sliderW, 0f, 1f);
+                            SoundEffect.MasterVolume = _sfxVolume = newVol;
+                        }
+                    }
+                    else
+                    {
+                        if (isMusic) _isDraggingMusic = false;
+                        else _isDraggingSFX = false;
+                    }
+                }
+                
+                DrawSlider("MÜZİK SESİ", sliderX, musicSliderY, _musicManager.MasterVolume, true);
+                DrawSlider("SES EFEKTLERİ", sliderX, sfxSliderY, _sfxVolume, false);
+                
+                // BACK BUTTON
+                 DrawButton("GERİ", 260, Color.White, Color.Cyan, () => {
+                    _showSettingsInPause = false;
+                });
+            }
         }
         
         if (_currentState == GameState.Dead)

@@ -9,6 +9,7 @@ namespace EternalJourney
     public class SkillBarUI
     {
         private SkillManager _skillManager;
+        private Inventory _inventory;
         private GraphicsDevice _graphicsDevice;
         private Texture2D _slotTexture;
         private Texture2D _cooldownOverlay;
@@ -21,10 +22,11 @@ namespace EternalJourney
         
         private Rectangle _bounds;
 
-        public SkillBarUI(GraphicsDevice graphicsDevice, SkillManager skillManager, int screenWidth, int screenHeight)
+        public SkillBarUI(GraphicsDevice graphicsDevice, SkillManager skillManager, Inventory inventory, int screenWidth, int screenHeight)
         {
             _graphicsDevice = graphicsDevice;
             _skillManager = skillManager;
+            _inventory = inventory;
             _screenWidth = screenWidth;
             _screenHeight = screenHeight;
             
@@ -100,6 +102,43 @@ namespace EternalJourney
                 spriteBatch.DrawString(font, skill.KeyDisplay, 
                     new Vector2(slotRect.X + 5, slotRect.Y + 2), 
                     Color.Yellow, 0f, Vector2.Zero, 0.8f, SpriteEffects.None, 0f);
+            }
+            
+            // --- POTION SLOT ---
+            int potionX = startX + _skillManager.Skills.Count * (SLOT_SIZE + PADDING) + 20;
+            Rectangle potRect = new Rectangle(potionX, y, SLOT_SIZE, SLOT_SIZE);
+            
+            // Background
+            spriteBatch.Draw(_slotTexture, potRect, Color.White);
+            
+            Item potItem = _inventory.GetFirstPotion();
+            int potCount = _inventory.GetPotionCount();
+            
+            if (potItem != null && potItem.Icon != null)
+            {
+                spriteBatch.Draw(potItem.Icon, 
+                    new Rectangle(potRect.X + 4, potRect.Y + 4, SLOT_SIZE - 8, SLOT_SIZE - 8), 
+                    Color.White);
+            }
+            
+            // Key Binding (0)
+            spriteBatch.DrawString(font, "0", 
+                 new Vector2(potRect.X + 5, potRect.Y + 2), 
+                 Color.Yellow, 0f, Vector2.Zero, 0.8f, SpriteEffects.None, 0f);
+                 
+            // Quantity
+            if (potCount > 0)
+            {
+                string qty = potCount.ToString();
+                Vector2 sz = font.MeasureString(qty);
+                Vector2 pos = new Vector2(potRect.Right - sz.X - 4, potRect.Bottom - sz.Y - 2);
+                spriteBatch.DrawString(font, qty, pos + new Vector2(1,1), Color.Black);
+                spriteBatch.DrawString(font, qty, pos, Color.White);
+            }
+            else
+            {
+                // Dim if empty
+                spriteBatch.Draw(_cooldownOverlay, potRect, new Color(0, 0, 0, 150));
             }
         }
 

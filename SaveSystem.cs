@@ -99,4 +99,21 @@ public static class SaveManager
         }
         return slots;
     }
+    
+    public static void DeleteSave(int slotIndex)
+    {
+        try
+        {
+             string path = GetSavePath(slotIndex);
+             if (File.Exists(path))
+             {
+                 File.Delete(path);
+                 System.Diagnostics.Debug.WriteLine($"Oyun slot {slotIndex} silindi.");
+             }
+        }
+        catch (Exception ex)
+        {
+             System.Diagnostics.Debug.WriteLine($"Silme hatası (Slot {slotIndex}): {ex.Message}");
+        }
+    }
 }

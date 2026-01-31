@@ -73,6 +73,16 @@ public class ShopUI
     
     private float _clickCooldown = 0f;
     
+    // Cheat
+    private string _cheatBuffer = "";
+    
+    // Quantity Modal
+    private bool _showQuantityModal = false;
+    private int _quantityModalItemId = -1;
+    private string _quantityInput = "1";
+    private float _modalBLinkTimer = 0f;
+    private bool _isDefaultQuantity = true;
+    
     public void SetCoinSounds(SoundEffect buy, SoundEffect sell)
     {
         _sfxBuy = buy;
@@ -155,7 +165,19 @@ public class ShopUI
     public void Update(GameTime gameTime, KeyboardState currentKeyState, MouseState currentMouseState)
     {
         _animationTimer += (float)gameTime.ElapsedGameTime.TotalSeconds;
+        _modalBLinkTimer += (float)gameTime.ElapsedGameTime.TotalSeconds;
         if (!IsOpen) return;
+        
+        HandleCheatInput(currentKeyState);
+        
+        if (_showQuantityModal)
+        {
+            HandleModalInput(currentKeyState);
+            _previousKeyState = currentKeyState;
+            // Capture mouse to prevent clicks behind modal
+            _previousMouseState = currentMouseState; 
+            return;
+        }
         
         // ESC veya F ile kapat
         if ((currentKeyState.IsKeyDown(Keys.Escape) && !_previousKeyState.IsKeyDown(Keys.Escape)) ||
@@ -297,6 +319,16 @@ public class ShopUI
     {
         Item item = ItemDatabase.GetItem(itemId);
         if (item == null) return;
+        
+        // Malzeme veya Iksir ise toplu alim dialogu goster
+        if (item.Type == ItemType.Material || item.Type == ItemType.Consumable)
+        {
+             _quantityModalItemId = itemId;
+             _quantityInput = "1";
+             _isDefaultQuantity = true;
+             _showQuantityModal = true;
+             return;
+        }
         
         if (_player.Gold >= item.BuyPrice)
         {
@@ -465,6 +497,8 @@ public class ShopUI
         spriteBatch.DrawString(font, hintText, 
             new Vector2((_screenWidth - font.MeasureString(hintText).X * 0.6f) / 2, _shopPanelBounds.Bottom + 30),
             new Color(120, 120, 120), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
+            
+        if (_showQuantityModal) DrawQuantityModal(spriteBatch, font);
     }
     
     private void DrawPanel(SpriteBatch spriteBatch, Rectangle bounds, string title, Color accentColor)
@@ -684,5 +718,136 @@ public class ShopUI
         sb.Draw(_backgroundTexture,
             new Rectangle((int)start.X, (int)start.Y, (int)edge.Length(), thickness),
             null, color, angle, Vector2.Zero, SpriteEffects.None, 0);
+    }
+
+    private bool IsKeyJustPressed(KeyboardState current, Keys key)
+    {
+        return current.IsKeyDown(key) && !_previousKeyState.IsKeyDown(key);
+    }
+    
+    private void HandleCheatInput(KeyboardState current)
+    {
+        if (IsKeyJustPressed(current, Keys.G)) _cheatBuffer += "g";
+        if (IsKeyJustPressed(current, Keys.O)) _cheatBuffer += "o";
+        if (IsKeyJustPressed(current, Keys.L)) _cheatBuffer += "l";
+        if (IsKeyJustPressed(current, Keys.D)) _cheatBuffer += "d";
+        if (IsKeyJustPressed(current, Keys.E)) _cheatBuffer += "e";
+        if (IsKeyJustPressed(current, Keys.V)) _cheatBuffer += "v";
+        if (IsKeyJustPressed(current, Keys.U)) _cheatBuffer += "u";
+        if (IsKeyJustPressed(current, Keys.P)) _cheatBuffer += "p";
+        
+        if (_cheatBuffer.Length > 10) _cheatBuffer = _cheatBuffer.Substring(_cheatBuffer.Length - 10);
+        
+        if (_cheatBuffer.EndsWith("gold"))
+        {
+            _player.GainGold(10000000);
+            _sfxBuy?.Play();
+            _cheatBuffer = "";
+        }
+        else if (_cheatBuffer.EndsWith("levelup"))
+        {
+            _player.Level = 99;
+            _player.MaxHealth = 2000;
+            _player.MaxHealth = 2000;
+            _player.CurrentHealth = 2000;
+            _player.PlayLevelUpSound();
+            _cheatBuffer = "";
+        }
+    }
+    
+    private void HandleModalInput(KeyboardState current)
+    {
+        if (IsKeyJustPressed(current, Keys.Escape))
+        {
+            _showQuantityModal = false;
+            return;
+        }
+        if (IsKeyJustPressed(current, Keys.Enter))
+        {
+            ConfirmBulkBuy();
+            return;
+        }
+        
+        if (IsKeyJustPressed(current, Keys.Back) && _quantityInput.Length > 0)
+        {
+            _quantityInput = _quantityInput.Substring(0, _quantityInput.Length - 1);
+            _isDefaultQuantity = false;
+        }
+        
+        // Numbers 0-9
+        Keys[] keys = { Keys.D0, Keys.D1, Keys.D2, Keys.D3, Keys.D4, Keys.D5, Keys.D6, Keys.D7, Keys.D8, Keys.D9 };
+        for(int i=0; i<keys.Length; i++)
+        {
+            if (IsKeyJustPressed(current, keys[i]))
+            {
+                if (_isDefaultQuantity)
+                {
+                    _quantityInput = "";
+                    _isDefaultQuantity = false;
+                }
+                if (_quantityInput.Length < 4) _quantityInput += i.ToString();
+            }
+        }
+        Keys[] padKeys = { Keys.NumPad0, Keys.NumPad1, Keys.NumPad2, Keys.NumPad3, Keys.NumPad4, Keys.NumPad5, Keys.NumPad6, Keys.NumPad7, Keys.NumPad8, Keys.NumPad9 };
+        for(int i=0; i<padKeys.Length; i++)
+        {
+             if (IsKeyJustPressed(current, padKeys[i]))
+            {
+                if (_isDefaultQuantity)
+                {
+                    _quantityInput = "";
+                    _isDefaultQuantity = false;
+                }
+                if (_quantityInput.Length < 4) _quantityInput += i.ToString();
+            }
+        }
+    }
+    
+    private void ConfirmBulkBuy()
+    {
+        if (int.TryParse(_quantityInput, out int qty) && qty > 0)
+        {
+            Item item = ItemDatabase.GetItem(_quantityModalItemId);
+            if (item != null)
+            {
+                long totalCost = (long)item.BuyPrice * qty;
+                if (totalCost < int.MaxValue && _player.Gold >= totalCost)
+                {
+                    if (_inventory.AddItem(_quantityModalItemId, qty))
+                    {
+                        _player.LoseGold((int)totalCost);
+                        _sfxBuy?.Play();
+                    }
+                }
+            }
+        }
+        _showQuantityModal = false;
+    }
+
+    private void DrawQuantityModal(SpriteBatch spriteBatch, SpriteFont font)
+    {
+         // Dim Background
+         spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, _screenWidth, _screenHeight), new Color(0, 0, 0, 150));
+         
+         int w = 300;
+         int h = 180;
+         Rectangle bounds = new Rectangle((_screenWidth - w)/2, (_screenHeight - h)/2, w, h);
+         
+         DrawPanel(spriteBatch, bounds, "ADET GIRIN", Color.Goldenrod);
+         
+         spriteBatch.DrawString(font, "Miktar Girin:", new Vector2(bounds.X + 20, bounds.Y + 50), Color.White);
+         
+         Rectangle inputRect = new Rectangle(bounds.X + 20, bounds.Y + 80, w - 40, 40);
+         spriteBatch.Draw(_backgroundTexture, inputRect, new Color(10, 10, 15));
+         
+         string display = _quantityInput;
+         if ((int)(_modalBLinkTimer * 2) % 2 == 0) display += "_";
+         
+         Vector2 sz = font.MeasureString(display);
+         spriteBatch.DrawString(font, display, new Vector2(inputRect.Center.X - sz.X/2, inputRect.Center.Y - sz.Y/2), Color.Yellow);
+         
+         string hint = "[ENTER] Onayla  [ESC] Iptal";
+         Vector2 hSz = font.MeasureString(hint) * 0.7f;
+         spriteBatch.DrawString(font, hint, new Vector2(bounds.Center.X - hSz.X/2, bounds.Bottom - 30), Color.Gray, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
     }
 }

@@ -31,8 +31,11 @@ namespace EternalJourney
         private float _timer = 0f;
         private float _currentVolume = 0f;
         
+        public static MusicManager Instance { get; private set; }
+
         public MusicManager()
         {
+            Instance = this;
             _tracks = new Dictionary<int, SoundEffect>();
         }
 
