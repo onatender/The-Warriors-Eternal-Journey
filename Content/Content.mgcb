@@ -111,6 +111,18 @@
 /processorParam:Quality=Best
 /build:SFX/goblin_idle.mp3
 
+#begin SFX/item_pickup.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/item_pickup.mp3
+
+#begin SFX/item_equip.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:SFX/item_equip.mp3
+
 #begin SFX/upgrade_succesful.mp3
 /importer:Mp3Importer
 /processor:SoundEffectProcessor

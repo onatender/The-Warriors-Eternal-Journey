@@ -368,7 +368,7 @@ public partial class Game1 : Game
                 _gameLog.AddMessage($"+{xpAmount} XP", Color.Cyan);
                 
                 // Altın Popup yerine Log
-                _gameLog.AddMessage($"+{goldAmount} Altin", Color.Gold);
+                _gameLog.AddMessage($"+{goldAmount} Altın", Color.Gold);
                 
                 // === LOOT DROP ===
                 var drops = LootManager.GetLoot(enemy.Type);
@@ -380,7 +380,7 @@ public partial class Game1 : Game
                         Item itemDrop = ItemDatabase.GetItem(drop.ItemId);
                         
                         // Drop bildirimi
-                        _gameLog.AddMessage($"Kazanildi: {itemDrop.Name}", itemDrop.GetRarityColor());
+                        _gameLog.AddMessage($"Kazanıldı: {itemDrop.Name}", itemDrop.GetRarityColor());
                     }
                 }
             }
@@ -432,7 +432,23 @@ public partial class Game1 : Game
             _graphics.PreferredBackBufferWidth,
             _graphics.PreferredBackBufferHeight);
         _vendorPosition = new Vector2(200, 300); // Map 1'de sabit pozisyon
-        _vendorTexture = CreateVendorTexture(GraphicsDevice);
+        _vendorPosition = new Vector2(200, 300); // Map 1'de sabit pozisyon
+        try {
+            // Raw PNG Load
+            // Absolute path or relative to output
+            using(var stream = new System.IO.FileStream("Content/icons/shop.png", System.IO.FileMode.Open))
+            {
+                _vendorTexture = Texture2D.FromStream(GraphicsDevice, stream);
+            }
+        } catch(System.Exception ex) {
+            // Backup color
+            _vendorTexture = new Texture2D(GraphicsDevice, 48, 64);
+            Color[] backup = new Color[48 * 64];
+            for(int i = 0; i < backup.Length; i++) backup[i] = Color.Purple;
+            _vendorTexture.SetData(backup);
+            
+            _gameLog.AddMessage($"Shop Icon Load Error: {ex.Message}", Color.Red);
+        }
         
         // Enemy Manager oluştur
         _enemyManager = new EnemyManager(GraphicsDevice);
@@ -1046,10 +1062,6 @@ public partial class Game1 : Game
             if (_currentMapIndex == 1)
             {
                 _spriteBatch.Draw(_vendorTexture, _vendorPosition, Color.White);
-                
-                string vendorName = "SATICI";
-                Vector2 namePos = new Vector2(_vendorPosition.X + 24 - _gameFont.MeasureString(vendorName).X * 0.3f, _vendorPosition.Y - 15);
-                _spriteBatch.DrawString(_gameFont, vendorName, namePos, Color.Yellow, 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
             }
             
             // Oyuncuyu çiz
@@ -1182,7 +1194,7 @@ public partial class Game1 : Game
                 _currentState = GameState.Playing;
             });
             
-            DrawButton("CIKIS", 140, Color.IndianRed, Color.Red, () => {
+            DrawButton("ÇIKIŞ", 140, Color.IndianRed, Color.Red, () => {
                 Exit();
             });
             
@@ -1231,8 +1243,8 @@ public partial class Game1 : Game
                 }
             }
             
-            DrawSlider("MUZIK SESI", sliderX, musicSliderY, _musicManager.MasterVolume, true);
-            DrawSlider("SES EFEKTLERI", sliderX, sfxSliderY, _sfxVolume, false);
+            DrawSlider("MÜZİK SESİ", sliderX, musicSliderY, _musicManager.MasterVolume, true);
+            DrawSlider("SES EFEKTLERİ", sliderX, sfxSliderY, _sfxVolume, false);
         }
         
         if (_currentState == GameState.Dead)
@@ -1327,12 +1339,12 @@ public partial class Game1 : Game
         _skillBarUI.Draw(_spriteBatch, _gameFont);
         
         // Map Bilgisi (Sağ Üst)
-        string mapText = $"Bolge: {_currentMapIndex}";
-        if (_currentMapIndex == 1) mapText += " (Guvenli)";
+        string mapText = $"Bölge: {_currentMapIndex}";
+        if (_currentMapIndex == 1) mapText += " (Güvenli)";
         else if (_currentMapIndex == 2) mapText += " (Goblin)";
-        else if (_currentMapIndex == 3) mapText += " (Orumcek)";
-        else if (_currentMapIndex == 4) mapText += " (Iskelet)";
-        else if (_currentMapIndex == 5) mapText += " (Seytan)";
+        else if (_currentMapIndex == 3) mapText += " (Örümcek)";
+        else if (_currentMapIndex == 4) mapText += " (İskelet)";
+        else if (_currentMapIndex == 5) mapText += " (Şeytan)";
         
         Vector2 mapSize = _gameFont.MeasureString(mapText);
         _spriteBatch.DrawString(_gameFont, mapText, 
@@ -1359,87 +1371,10 @@ public partial class Game1 : Game
             _player.Center + new Vector2(0, -60),
             _pendingDeathPenalty,
             Color.Red
-        ) { CustomText = $"OLDUN! -{_pendingDeathPenalty} Gold" });
+        ) { CustomText = $"ÖLDÜN! -{_pendingDeathPenalty} Gold" });
     }
     
-    private Texture2D CreateVendorTexture(GraphicsDevice gd)
-    {
-        int width = 48;
-        int height = 64;
-        Texture2D texture = new Texture2D(gd, width, height);
-        Color[] data = new Color[width * height];
-        
-        // Renkler
-        Color robeColor = new Color(80, 40, 120); // Mor cüppe
-        Color skinColor = new Color(220, 180, 140);
-        Color goldAccent = new Color(255, 200, 50);
-        Color darkRobe = new Color(50, 25, 80);
-        
-        int centerX = width / 2;
-        
-        for (int y = 0; y < height; y++)
-        {
-            for (int x = 0; x < width; x++)
-            {
-                int i = y * width + x;
-                data[i] = Color.Transparent;
-                
-                // Kafa (Daire)
-                if (y >= 5 && y < 20)
-                {
-                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(centerX, 12));
-                    if (dist < 8)
-                    {
-                        data[i] = skinColor;
-                        // Gözler
-                        if (y == 11 && (x == centerX - 3 || x == centerX + 3))
-                            data[i] = Color.Black;
-                        // Ağız
-                        if (y == 15 && Math.Abs(x - centerX) < 2)
-                            data[i] = new Color(150, 100, 100);
-                    }
-                }
-                
-                // Kapşon (Baş etrafında)
-                if (y >= 2 && y < 18)
-                {
-                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(centerX, 10));
-                    if (dist >= 9 && dist < 13)
-                    {
-                        data[i] = darkRobe;
-                    }
-                }
-                
-                // Cüppe (Gövde)
-                if (y >= 18 && y < height - 4)
-                {
-                    int robeWidth = 12 + (y - 18) / 3;
-                    if (Math.Abs(x - centerX) < robeWidth)
-                    {
-                        data[i] = robeColor;
-                        // Altın şerit
-                        if (Math.Abs(x - centerX) < 2)
-                            data[i] = goldAccent;
-                        // Kenar
-                        if (Math.Abs(x - centerX) >= robeWidth - 2)
-                            data[i] = darkRobe;
-                    }
-                }
-                
-                // Eller (Yanlarda)
-                if (y >= 30 && y < 40)
-                {
-                    if ((x >= 5 && x < 12) || (x >= width - 12 && x < width - 5))
-                    {
-                        data[i] = skinColor;
-                    }
-                }
-            }
-        }
-        
-        texture.SetData(data);
-        return texture;
-    }
+
 
     private Texture2D CreateDungeonFloor(int mapIndex)
     {

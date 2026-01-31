@@ -289,10 +289,10 @@ public class TitleScreen
             else
             {
                 // Empty
-                spriteBatch.DrawString(font, $"SLOT {i+1}: [ EMPTY ]", new Vector2(r.X + 20, r.Y + 35), Color.Gray);
+                spriteBatch.DrawString(font, $"SLOT {i+1}: [ BOŞ ]", new Vector2(r.X + 20, r.Y + 35), Color.Gray);
                 if (isHover)
                 {
-                     string clickText = "(Click to Create New)";
+                     string clickText = "(Yeni Oluşturmak İçin Tıkla)";
                      Vector2 clickSz = font.MeasureString(clickText) * 0.7f;
                      spriteBatch.DrawString(font, clickText, 
                         new Vector2(r.Right - clickSz.X - 20, r.Y + 35), 
@@ -313,7 +313,7 @@ public class TitleScreen
             spriteBatch.Draw(_panelTexture, boxRect, new Color(50, 50, 60));
             spriteBatch.Draw(_panelTexture, new Rectangle(boxRect.X, boxRect.Y, boxW, 2), Color.Cyan); // Border Top
             
-            string prompt = "ENTER CHARACTER NAME:";
+            string prompt = "KARAKTER İSMİ GİRİN:";
             Vector2 pSize = font.MeasureString(prompt);
             spriteBatch.DrawString(font, prompt, new Vector2(boxRect.X + (boxW-pSize.X)/2, boxRect.Y + 40), Color.Cyan);
             
@@ -328,13 +328,13 @@ public class TitleScreen
             
             // Start Btn
             spriteBatch.Draw(_panelTexture, _btnStartRect, startColor);
-            string startTxt = "BASLA";
+            string startTxt = "BAŞLA";
             Vector2 sSz = font.MeasureString(startTxt);
             spriteBatch.DrawString(font, startTxt, new Vector2(_btnStartRect.Center.X - sSz.X/2, _btnStartRect.Center.Y - sSz.Y/2), Color.White);
             
             // Cancel Btn
             spriteBatch.Draw(_panelTexture, _btnCancelRect, cancelColor);
-            string cancelTxt = "IPTAL";
+            string cancelTxt = "İPTAL";
             Vector2 cSz = font.MeasureString(cancelTxt);
             spriteBatch.DrawString(font, cancelTxt, new Vector2(_btnCancelRect.Center.X - cSz.X/2, _btnCancelRect.Center.Y - cSz.Y/2), Color.White);
         }

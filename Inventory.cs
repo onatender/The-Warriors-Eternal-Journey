@@ -603,12 +603,6 @@ public class Inventory
         {
             HandleLeftClick(mousePos);
         }
-        // Mouse bırakma (Released) - Drag bitir
-        else if (currentMouseState.LeftButton == ButtonState.Released && 
-                 _previousMouseState.LeftButton == ButtonState.Pressed)
-        {
-            if (_isDragging) EndDrag(mousePos);
-        }
         
         // Sağ tık - eşya giy/çıkar
         if (currentMouseState.RightButton == ButtonState.Pressed && 
@@ -650,6 +644,13 @@ public class Inventory
         if (_hoveringNext && _currentPage < PAGE_COUNT - 1)
         {
             _currentPage++;
+            return;
+        }
+
+        // --- DRAG END (Eğer taşıyorsak bırak) ---
+        if (_isDragging)
+        {
+            EndDrag(mousePos);
             return;
         }
 
@@ -885,6 +886,10 @@ public class Inventory
     private bool CanEquipItem(Item item, int slotIndex)
     {
         if (item == null) return false;
+        
+        // Level kontrolü
+        if (_player.Level < item.RequiredLevel) return false;
+
         if (slotIndex == 0 && item.Type == ItemType.Weapon) return true;
         if (slotIndex == 1 && item.Type == ItemType.Armor) return true;
         if (slotIndex == 2 && item.Type == ItemType.Shield) return true;
@@ -915,20 +920,20 @@ public class Inventory
                     return;
                 }
                 
-                if (slot.Item.Type == ItemType.Weapon)
-                {
                     // Silahı giy
-                    SwapOrMove(slot, WeaponSlot);
-                    OnWeaponEquipped?.Invoke(WeaponSlot.Item);
-                    _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
-                }
-                else if (slot.Item.Type == ItemType.Armor)
-                {
+                    if (_player.Level >= slot.Item.RequiredLevel)
+                    {
+                        SwapOrMove(slot, WeaponSlot);
+                        OnWeaponEquipped?.Invoke(WeaponSlot.Item);
+                        _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
+                    }
                     // Zırhı giy
-                    SwapOrMove(slot, ArmorSlot);
-                    OnArmorEquipped?.Invoke(ArmorSlot.Item);
-                    _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
-                }
+                    if (_player.Level >= slot.Item.RequiredLevel)
+                    {
+                        SwapOrMove(slot, ArmorSlot);
+                        OnArmorEquipped?.Invoke(ArmorSlot.Item);
+                        _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
+                    }
                 else if (slot.Item.Type == ItemType.Consumable)
                 {
                     // Potions
@@ -943,20 +948,20 @@ public class Inventory
                         }
                     }
                 }
-                else if (slot.Item.Type == ItemType.Shield)
-                {
                     // Kalkanı giy
-                    SwapOrMove(slot, ShieldSlot);
-                    OnShieldEquipped?.Invoke(ShieldSlot.Item);
-                    _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
-                }
-                else if (slot.Item.Type == ItemType.Helmet)
-                {
+                    if (_player.Level >= slot.Item.RequiredLevel)
+                    {
+                        SwapOrMove(slot, ShieldSlot);
+                        OnShieldEquipped?.Invoke(ShieldSlot.Item);
+                        _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
+                    }
                     // Kaskı giy
-                    SwapOrMove(slot, HelmetSlot);
-                    OnHelmetEquipped?.Invoke(HelmetSlot.Item);
-                    _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
-                }
+                    if (_player.Level >= slot.Item.RequiredLevel)
+                    {
+                        SwapOrMove(slot, HelmetSlot);
+                        OnHelmetEquipped?.Invoke(HelmetSlot.Item);
+                        _sfxItemEquip?.Play(0.6f, 0.0f, 0.0f);
+                    }
             }
         }
         // Equipment slot - sağ tık ile eşya çıkar
@@ -1083,8 +1088,8 @@ public class Inventory
                     );
                     spriteBatch.Draw(slot.Item.Icon, iconRect, slot.Item.GetTintColor());
                     
-                    // İlahi Efekt (ID 32: Tılsım, ID 10: Ebedi Kılıç)
-                    if (slot.Item.Id == 32 || slot.Item.Id == 10)
+                    // İlahi Efekt (ID 32: Tılsım, ID 10: Ebedi Kılıç, ID 11: Ejderha Zırhı)
+                    if (slot.Item.Id == 32 || slot.Item.Id == 10 || slot.Item.Id == 11)
                     {
                         DrawDivineEffect(spriteBatch, iconRect);
                     }
@@ -1164,7 +1169,7 @@ public class Inventory
         }
         
         // Kontrol ipuçları
-        string hint = "[E] Kapat  [Sag Tik] Giy/Kullan/Cikar";
+        string hint = "[E] Kapat  [Sağ Tık] Giy/Kullan/Çıkar";
         Vector2 hintPos = new Vector2(_position.X + 20, _position.Y + _bounds.Height - 18);
         spriteBatch.DrawString(font, hint, hintPos, new Color(150, 150, 150), 
             0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
@@ -1209,6 +1214,12 @@ public class Inventory
             // Item ikonu
             Rectangle iconRect = new Rectangle(rect.X + 10, rect.Y + 10, 40, 40);
             spriteBatch.Draw(slot.Item.Icon, iconRect, slot.Item.GetTintColor());
+            
+            // İlahi Efekt (Equipment Slot için)
+            if (slot.Item.Id == 32 || slot.Item.Id == 10 || slot.Item.Id == 11)
+            {
+                DrawDivineEffect(spriteBatch, rect); // Slotun tamamına veya iconRect'e uygulayabiliriz
+            }
         }
     }
     
@@ -1219,18 +1230,18 @@ public class Inventory
         string type = item.Type switch
         {
             ItemType.Weapon => "Silah",
-            ItemType.Armor => "Zirh",
+            ItemType.Armor => "Zırh",
             ItemType.Shield => "Kalkan",
             ItemType.Helmet => "Kask",
             ItemType.Material => "Malzeme",
-            _ => "Esya"
+            _ => "Eşya"
         };
         string level = item.RequiredLevel > 0 ? $"Gerekli Seviye: {item.RequiredLevel}" : "";
         
         string stats = "";
         if (item.Type == ItemType.Weapon)
         {
-            stats = $"Hasar: {item.MinDamage}-{item.MaxDamage}\nSaldiri Hizi: {item.AttackSpeed}";
+            stats = $"Hasar: {item.MinDamage}-{item.MaxDamage}\nSaldırı Hızı: {item.AttackSpeed}";
         }
         else if (item.Type == ItemType.Armor)
         {
@@ -1246,7 +1257,7 @@ public class Inventory
         }
         
         // Fiyat bilgisi
-        string priceInfo = $"Satis: {item.SellPrice}G | Alis: {item.BuyPrice}G";
+        string priceInfo = $"Satış: {item.SellPrice}G | Alış: {item.BuyPrice}G";
         
         // Açıklama Metni
         string description = item.Description ?? "";
@@ -1389,28 +1400,25 @@ public class Inventory
     
     private void DrawArrow(SpriteBatch spriteBatch, Rectangle buttonRect, bool left, Color color)
     {
-        int centerX = buttonRect.X + buttonRect.Width / 2;
-        int centerY = buttonRect.Y + buttonRect.Height / 2;
-        int arrowSize = 6;
+        int x = buttonRect.Center.X;
+        int y = buttonRect.Center.Y;
+        int size = 8;
         
-        if (left)
+        for(int i=0; i<=size; i++)
         {
-            for (int i = 0; i < 3; i++)
+            if(left)
             {
-                spriteBatch.Draw(_backgroundTexture,
-                    new Rectangle(centerX - arrowSize + i + 2, centerY - arrowSize + i, 2, 2), color);
-                spriteBatch.Draw(_backgroundTexture,
-                    new Rectangle(centerX - arrowSize + i + 2, centerY + arrowSize - i - 2, 2, 2), color);
+                // < Şekli
+                int px = (x - size/2) + i;
+                int halfH = i;
+                spriteBatch.Draw(_backgroundTexture, new Rectangle(px, y - halfH, 2, 2 * halfH + 1), color);
             }
-        }
-        else
-        {
-            for (int i = 0; i < 3; i++)
+            else
             {
-                spriteBatch.Draw(_backgroundTexture,
-                    new Rectangle(centerX + arrowSize - i - 4, centerY - arrowSize + i, 2, 2), color);
-                spriteBatch.Draw(_backgroundTexture,
-                    new Rectangle(centerX + arrowSize - i - 4, centerY + arrowSize - i - 2, 2, 2), color);
+                // > Şekli
+                int px = (x - size/2) + i;
+                int halfH = size - i;
+                spriteBatch.Draw(_backgroundTexture, new Rectangle(px, y - halfH, 2, 2 * halfH + 1), color);
             }
         }
     }
