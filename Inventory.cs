@@ -1519,7 +1519,10 @@ public class Inventory
                         { 
                             ItemId = _slots[p, y, x].Item.Id,
                             Quantity = _slots[p, y, x].Quantity,
-                            EnhancementLevel = _slots[p, y, x].Item.EnhancementLevel
+                            EnhancementLevel = _slots[p, y, x].Item.EnhancementLevel,
+                            Page = p,
+                            Row = y,
+                            Col = x
                         });
                     }
                 }
@@ -1550,7 +1553,29 @@ public class Inventory
                         item.UpgradeSuccess();
                     }
                     
-                    AddItemObject(item, savedItem.Quantity);
+                    // Pozisyona göre yükle
+                    if (savedItem.Page >= 0 && savedItem.Page < PAGE_COUNT &&
+                        savedItem.Row >= 0 && savedItem.Row < GRID_SIZE &&
+                        savedItem.Col >= 0 && savedItem.Col < GRID_SIZE)
+                    {
+                        // Belirtilen slota koy
+                        var slot = _slots[savedItem.Page, savedItem.Row, savedItem.Col];
+                        // Eğer slot doluysa (çakışma varsa) boş yer bul
+                        if (!slot.IsEmpty)
+                        {
+                             AddItemObject(item, savedItem.Quantity);
+                        }
+                        else
+                        {
+                            slot.Item = item;
+                            slot.Quantity = savedItem.Quantity;
+                        }
+                    }
+                    else
+                    {
+                        // Eski save veya pozisyon yoksa sırayla ekle
+                        AddItemObject(item, savedItem.Quantity);
+                    }
                 }
             }
         }

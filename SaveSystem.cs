@@ -33,7 +33,11 @@ public class SavedItem
     public int ItemId { get; set; }
     public int Quantity { get; set; }
     public int EnhancementLevel { get; set; } = 0;
-    // Slot bilgisini de tutabiliriz ama basitlik için sırayla ekleriz
+    
+    // Slot Pozisyonu
+    public int Page { get; set; } = -1;
+    public int Row { get; set; } = -1;
+    public int Col { get; set; } = -1;
 }
 
 public static class SaveManager

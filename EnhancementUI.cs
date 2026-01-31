@@ -268,19 +268,7 @@ public class EnhancementUI
         _inventory.RemoveItem(99, _costStones); 
         
         // Şans Hesapla
-        float chance = _baseSuccessChance;
-        
-        // Eğer İlahi Muska seçiliyse %100 yap
-        if (_selectedProtection != null && _selectedProtection.Id == 32)
-        {
-            chance = 100f;
-        }
-        else if (_selectedCharm != null)
-        {
-             if (_selectedCharm.Id == 20) chance += 10;
-             else if (_selectedCharm.Id == 21) chance += 25;
-             else if (_selectedCharm.Id == 22) chance += 50;
-        }
+        float chance = GetTotalSuccessChance();
         
         // Zar at (0.0 - 100.0)
         double roll = _rng.NextDouble() * 100.0;
@@ -570,17 +558,7 @@ public class EnhancementUI
         // --- SONUÇ VE BUTON (EN ALT) ---
         int bottomY = _windowBounds.Bottom - 110;
 
-        float totalChance = _baseSuccessChance;
-        if (_selectedCharm != null && _selectedCharm.Id == 32)
-        {
-            totalChance = 100f;
-        }
-        else if (_selectedCharm != null)
-        {
-             if (_selectedCharm.Id == 20) totalChance += 10;
-             else if (_selectedCharm.Id == 21) totalChance += 25;
-             else if (_selectedCharm.Id == 22) totalChance += 50;
-        }
+        float totalChance = GetTotalSuccessChance();
         
         string chanceText = $"Başarı Şansı: %{(totalChance > 100 ? 100 : totalChance):0.#}";
         Vector2 chanceSz = font.MeasureString(chanceText) * 0.9f;
@@ -657,6 +635,25 @@ public class EnhancementUI
             14 => 1f,
             _ => 0.5f // +15 ve sonrası için %0.5
         };
+    }
+
+    private float GetTotalSuccessChance()
+    {
+        float chance = _baseSuccessChance;
+        
+        // Eğer İlahi Tılsım seçiliyse %100 yap
+        if (_selectedCharm != null && _selectedCharm.Id == 32)
+        {
+            return 100f;
+        }
+        else if (_selectedCharm != null)
+        {
+             if (_selectedCharm.Id == 20) chance += 10;
+             else if (_selectedCharm.Id == 21) chance += 25;
+             else if (_selectedCharm.Id == 22) chance += 50;
+        }
+        
+        return chance > 100f ? 100f : chance;
     }
 
     private void DrawBorder(SpriteBatch sb, Rectangle rect, int thickness, Color color)
