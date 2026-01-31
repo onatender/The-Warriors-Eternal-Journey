@@ -83,6 +83,11 @@ public class ShopUI
     private float _modalBLinkTimer = 0f;
     private bool _isDefaultQuantity = true;
     
+    // Sell Confirmation Modal
+    private bool _showSellConfirmation = false;
+    private InventorySlot _sellConfirmSlot = null;
+    private int _sellConfirmPrice = 0;
+    
     public void SetCoinSounds(SoundEffect buy, SoundEffect sell)
     {
         _sfxBuy = buy;
@@ -176,6 +181,14 @@ public class ShopUI
             _previousKeyState = currentKeyState;
             // Capture mouse to prevent clicks behind modal
             _previousMouseState = currentMouseState; 
+            return;
+        }
+        
+        if (_showSellConfirmation)
+        {
+            HandleSellConfirmationInput(currentKeyState);
+            _previousKeyState = currentKeyState;
+            _previousMouseState = currentMouseState;
             return;
         }
         
@@ -344,6 +357,22 @@ public class ShopUI
     {
         if (slot == null || slot.IsEmpty) return;
         
+        // Check for enhanced item
+        if (slot.Item.EnhancementLevel > 0)
+        {
+            _sellConfirmSlot = slot;
+            _sellConfirmPrice = slot.Item.SellPrice;
+            _showSellConfirmation = true;
+            return;
+        }
+        
+        // Normal sell
+        ConfirmSell(slot);
+    }
+    
+    private void ConfirmSell(InventorySlot slot)
+    {
+        if (slot == null || slot.IsEmpty) return;
         int sellPrice = slot.Item.SellPrice;
         
         slot.Quantity--;
@@ -499,6 +528,8 @@ public class ShopUI
             new Color(120, 120, 120), 0f, Vector2.Zero, 0.6f, SpriteEffects.None, 0f);
             
         if (_showQuantityModal) DrawQuantityModal(spriteBatch, font);
+        
+        if (_showSellConfirmation) DrawSellConfirmationModal(spriteBatch, font);
     }
     
     private void DrawPanel(SpriteBatch spriteBatch, Rectangle bounds, string title, Color accentColor)
@@ -803,6 +834,21 @@ public class ShopUI
         }
     }
     
+    private void HandleSellConfirmationInput(KeyboardState current)
+    {
+        if (IsKeyJustPressed(current, Keys.Escape) || IsKeyJustPressed(current, Keys.N))
+        {
+            _showSellConfirmation = false;
+            _sellConfirmSlot = null;
+        }
+        else if (IsKeyJustPressed(current, Keys.Enter) || IsKeyJustPressed(current, Keys.Y))
+        {
+            ConfirmSell(_sellConfirmSlot);
+            _showSellConfirmation = false;
+            _sellConfirmSlot = null;
+        }
+    }
+    
     private void ConfirmBulkBuy()
     {
         if (int.TryParse(_quantityInput, out int qty) && qty > 0)
@@ -849,5 +895,36 @@ public class ShopUI
          string hint = "[ENTER] Onayla  [ESC] Iptal";
          Vector2 hSz = font.MeasureString(hint) * 0.7f;
          spriteBatch.DrawString(font, hint, new Vector2(bounds.Center.X - hSz.X/2, bounds.Bottom - 30), Color.Gray, 0f, Vector2.Zero, 0.7f, SpriteEffects.None, 0f);
+    }
+    private void DrawSellConfirmationModal(SpriteBatch spriteBatch, SpriteFont font)
+    {
+          // Dim Background
+         spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, _screenWidth, _screenHeight), new Color(0, 0, 0, 150));
+         
+         int w = 450;
+         int h = 220;
+         Rectangle bounds = new Rectangle((_screenWidth - w)/2, (_screenHeight - h)/2, w, h);
+         
+         DrawPanel(spriteBatch, bounds, "UYARI", Color.Red);
+         
+         string msg1 = "Bu eşya değerli görünüyor!";
+         string msg2 = "Satmak istediğine emin misin?";
+         
+         Vector2 sz1 = font.MeasureString(msg1);
+         Vector2 sz2 = font.MeasureString(msg2);
+         
+         spriteBatch.DrawString(font, msg1, new Vector2(bounds.Center.X - sz1.X/2, bounds.Y + 60), Color.Yellow);
+         spriteBatch.DrawString(font, msg2, new Vector2(bounds.Center.X - sz2.X/2, bounds.Y + 90), Color.White);
+         
+         if (_sellConfirmSlot != null)
+         {
+             string itemText = $"{_sellConfirmSlot.Item.Name} (+{_sellConfirmSlot.Item.EnhancementLevel})";
+             Vector2 szItem = font.MeasureString(itemText);
+             spriteBatch.DrawString(font, itemText, new Vector2(bounds.Center.X - szItem.X/2, bounds.Y + 130), _sellConfirmSlot.Item.GetRarityColor());
+         }
+         
+         string hint = "[ENTER] Evet   [ESC] Hayır";
+         Vector2 hSz = font.MeasureString(hint);
+         spriteBatch.DrawString(font, hint, new Vector2(bounds.Center.X - hSz.X/2, bounds.Bottom - 40), Color.Gray);
     }
 }

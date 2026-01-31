@@ -366,16 +366,19 @@ public partial class Game1 : Game
                 switch (enemy.Type)
                 {
                     case EnemyType.Goblin:
-                        goldAmount = new Random().Next(2, 7); // 2-6 Gold
+                        goldAmount = new Random().Next(5, 12); // Rebalance: 5-11 Gold
                         break;
                     case EnemyType.Spider:
-                        goldAmount = new Random().Next(8, 16); // 8-15 Gold
+                        goldAmount = new Random().Next(15, 26); // Rebalance: 15-25 Gold
                         break;
+                    case EnemyType.Skeleton:
+                         goldAmount = new Random().Next(30, 51); // New: 30-50 Gold
+                         break;
                     case EnemyType.Demon:
-                        goldAmount = new Random().Next(25, 51); // 25-50 Gold
+                        goldAmount = new Random().Next(100, 251); // Rebalance: 100-250 Gold
                         break;
                     default:
-                        goldAmount = 1;
+                        goldAmount = new Random().Next(5, 10);
                         break;
                 }
                 
@@ -389,7 +392,7 @@ public partial class Game1 : Game
                 _gameLog.AddMessage($"+{goldAmount} Altın", Color.Gold);
                 
                 // === LOOT DROP ===
-                var drops = LootManager.GetLoot(enemy.Type);
+                var drops = LootManager.GetLoot(enemy.Type, _currentMapIndex);
                 foreach(var drop in drops)
                 {
                     bool added = _inventory.AddItem(drop.ItemId, drop.Quantity);

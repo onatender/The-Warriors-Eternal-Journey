@@ -209,6 +209,23 @@ public static class ItemDatabase
             BuyPrice = 150, // Rebalance: 50 -> 150
             Icon = sword1 ?? CreateWeaponIcon(graphicsDevice, new Color(139, 90, 43)) // sword_1
         };
+
+        // ID 4: Demir Kılıç
+        _items[4] = new Item
+        {
+            Id = 4,
+            Name = "Demir Kılıç",
+            Description = "Keskin ve dayanıklı bir demir kılıç.",
+            Type = ItemType.Weapon,
+            Rarity = ItemRarity.Uncommon,
+            RequiredLevel = 10, // User Request: 10
+            EnhancementLevel = 0,
+            MinDamage = 12,
+            MaxDamage = 18,
+            AttackSpeed = 45,
+            BuyPrice = 450, 
+            Icon = sword2 ?? CreateWeaponIcon(graphicsDevice, Color.Silver)
+        };
         
         // ID 2: Kumaş Zırh
         _items[2] = new Item
@@ -234,7 +251,7 @@ public static class ItemDatabase
             Description = "Dayanıklı deri zırh",
             Type = ItemType.Armor,
             Rarity = ItemRarity.Common,
-            RequiredLevel = 1,
+            RequiredLevel = 5, // User Request: 5
             EnhancementLevel = 0,
             Defense = 10,
             Health = 20,
@@ -306,7 +323,8 @@ public static class ItemDatabase
             Rarity = ItemRarity.Common,
             RequiredLevel = 1,
             Health = 50, // Yenilenen can miktarı
-            BuyPrice = 500,
+
+            BuyPrice = 150, // 500 -> 150
             Icon = potionIcon
         };
 
@@ -321,7 +339,8 @@ public static class ItemDatabase
             Description = "Yükseltme şansını %10 artırır.",
             Type = ItemType.Material,
             Rarity = ItemRarity.Common,
-            BuyPrice = 300, // Rebalance: +10%
+
+            BuyPrice = 500, // 300 -> 500
             Icon = charm ?? CreateScrollIcon(graphicsDevice, new Color(240, 230, 200), new Color(50, 150, 50)),
             IconColor = Color.LightGreen // TINT
         };
@@ -334,7 +353,8 @@ public static class ItemDatabase
             Description = "Yükseltme şansını %25 artırır.",
             Type = ItemType.Material,
             Rarity = ItemRarity.Common,
-            BuyPrice = 750, // Rebalance: +25%
+
+            BuyPrice = 2500, // 750 -> 2500
             Icon = charm ?? CreateScrollIcon(graphicsDevice, new Color(255, 250, 220), new Color(50, 50, 150)),
             IconColor = Color.LightBlue // TINT
         };
@@ -347,7 +367,8 @@ public static class ItemDatabase
             Description = "Yükseltme şansını %50 artırır!",
             Type = ItemType.Material,
             Rarity = ItemRarity.Common,
-            BuyPrice = 2500, // Rebalance: +50%
+
+            BuyPrice = 10000, // 2500 -> 10000
             Icon = charm ?? CreateScrollIcon(graphicsDevice, new Color(255, 215, 0), new Color(200, 0, 0)),
             IconColor = Color.Gold // TINT
         };
@@ -405,7 +426,7 @@ public static class ItemDatabase
             Defense = 5,
             BlockChance = 10,
             BuyPrice = 150, // Rebalance: 60 -> 150
-            Icon = shield2 ?? CreateShieldIcon(graphicsDevice, new Color(139, 90, 43)) // shield_2 (Simpler)
+            Icon = shield1 ?? CreateShieldIcon(graphicsDevice, new Color(180, 180, 190)) // SWAPPED: Was shield2
         };
         
         // ID 41: Demir Kalkan
@@ -416,11 +437,11 @@ public static class ItemDatabase
             Description = "Sağlam demir kalkan. Yüksek bloklama şansı.",
             Type = ItemType.Shield,
             Rarity = ItemRarity.Common, // Revert to common to remove green tint if user wants "original" look
-            RequiredLevel = 1,
+            RequiredLevel = 10, // User Request: 10
             Defense = 12,
             BlockChance = 18,
             BuyPrice = 750, // Rebalance: 150 -> 750
-            Icon = shield1 ?? CreateShieldIcon(graphicsDevice, new Color(180, 180, 190)) // shield_1 (Better)
+            Icon = shield2 ?? CreateShieldIcon(graphicsDevice, new Color(139, 90, 43)) // SWAPPED: Was shield1
         };
         
         // === KASKLAR ===
@@ -448,7 +469,7 @@ public static class ItemDatabase
             Description = "Sağlam demir kask.",
             Type = ItemType.Helmet,
             Rarity = ItemRarity.Common,
-            RequiredLevel = 1,
+            RequiredLevel = 10, // User Request: 10
             Defense = 8,
             Health = 15,
             BuyPrice = 500,

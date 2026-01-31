@@ -174,6 +174,7 @@ public class Player
         {
             _level = value;
             MaxExperience = (long)(100 * Math.Pow(_level, 1.2));
+            RecalculateStats();
         }
     }
     
@@ -218,11 +219,13 @@ public class Player
     public void EquipShield(Item shield)
     {
         _equippedShield = shield;
+        RecalculateStats();
     }
     
     public void EquipHelmet(Item helmet)
     {
         _equippedHelmet = helmet;
+        RecalculateStats();
     }
     
     public Item GetEquippedShield() => _equippedShield;
@@ -254,6 +257,31 @@ public class Player
         return defense;
     }
     
+    public void RecalculateStats()
+    {
+        // Temel Sağlık: 100 + (Level * 10)
+        int baseHealth = 100 + (Level * 10);
+        
+        // Eşya Bonusları
+        int bonusHealth = 0;
+        if (_equippedArmor != null) bonusHealth += _equippedArmor.Health;
+        if (_equippedHelmet != null) bonusHealth += _equippedHelmet.Health;
+        if (_equippedShield != null) bonusHealth += _equippedShield.Health;
+        
+        // Yeni Max Sağlık
+        // Mevcut sağlık yüzdesini korumak yerine direkt artırıp azaltıyoruz (daha basit)
+        // Ama can düşmemeli (MaxHealth artınca current artmaz, ama azalınca current caplenir)
+        
+        int oldMax = MaxHealth;
+        MaxHealth = baseHealth + bonusHealth;
+        
+        if (CurrentHealth > MaxHealth) CurrentHealth = MaxHealth;
+        
+        // Eğer max health arttıysa, aradaki fark kadar can verelim mi? 
+        // Genelde verilmez ama oyuncu "eklenmemiş" derken bunu kastediyor olabilir.
+        // Şimdilik sadece MaxHealth'i güncelleyelim, canı full'lemesin.
+    }
+    
     // Saldırı event
     public event Action<Enemy, int> OnAttackHit;
     public event Action OnLevelUp;
@@ -272,6 +300,9 @@ public class Player
         CreateArmTexture(graphicsDevice); // Kol texture oluştur
         CreateWeaponTexture(graphicsDevice, new Color(139, 90, 43));
         CreateSweepTexture(graphicsDevice);
+        
+        RecalculateStats();
+        CurrentHealth = MaxHealth;
     }
     
     // Kol Texture Oluşturucu
@@ -719,6 +750,7 @@ public class Player
         _equippedArmor = armor;
         CreateTexture(_graphicsDevice); 
         CreateLegTexture(_graphicsDevice); // Bacakları güncelle
+        RecalculateStats();
     }
 
     // --- SKILL LOGIC ---
